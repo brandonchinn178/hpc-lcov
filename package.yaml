@@ -1,0 +1,44 @@
+name: hpc-codecov
+version: 0.1.0
+verbatim:
+  cabal-version: '>= 1.10'
+license: BSD3
+license-file: LICENSE
+author:
+  - Brandon Chinn <brandon@leapyear.io>
+maintainer:
+  - Brandon Chinn <brandon@leapyear.io>
+category: Control
+synopsis: Convert HPC output into Codecov JSON format
+description: |
+  Convert HPC output into Codecov JSON format.
+extra-source-files:
+  - README.md
+  - CHANGELOG.md
+
+github: LeapYear/hpc-codecov
+
+ghc-options: -Wall
+when:
+  - condition: impl(ghc >= 8.0)
+    ghc-options:
+      - -Wcompat
+      - -Wincomplete-record-updates
+      - -Wincomplete-uni-patterns
+      - -Wnoncanonical-monad-instances
+  - condition: impl(ghc < 8.8)
+    ghc-options:
+      - -Wnoncanonical-monadfail-instances
+
+dependencies:
+- base >= 4.9 && < 5
+
+library:
+  source-dirs: src
+
+tests:
+  hpc-codecov-test:
+    source-dirs:  test
+    main:         Main.hs
+    dependencies:
+      - tasty
