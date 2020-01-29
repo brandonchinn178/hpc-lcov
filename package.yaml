@@ -44,4 +44,7 @@ tests:
     source-dirs:  test
     main:         Main.hs
     dependencies:
+      - hpc-codecov
       - tasty
+      - tasty-discover
+      - tasty-golden
