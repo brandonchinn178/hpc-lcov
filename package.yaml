@@ -31,7 +31,10 @@ when:
       - -Wnoncanonical-monadfail-instances
 
 dependencies:
+- aeson >= 1.1.2.0 && < 1.5
 - base >= 4.9 && < 5
+- containers >= 0.5.7.1 && < 0.7
+- text >= 1.2.2.2 && < 1.4
 
 library:
   source-dirs: src
