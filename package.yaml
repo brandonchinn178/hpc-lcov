@@ -40,6 +40,19 @@ dependencies:
 library:
   source-dirs: src
 
+executable:
+  source-dirs: exe
+  main: Main.hs
+  dependencies:
+    # TODO bounds
+    - directory
+    - filepath
+    - hpc-codecov
+    - optparse-applicative
+    - process
+    - unordered-containers
+    - yaml
+
 tests:
   hpc-codecov-test:
     source-dirs:  test

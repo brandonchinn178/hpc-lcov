@@ -10,8 +10,8 @@ Convert HPC output into JSON files that can be uploaded to [Codecov](https://cod
 ### Stack
 
 1. Run `stack build hpc-codecov`
-1. Run your test with coverage, e.g. `stack test :my-test-suite --coverage`
-1. Run `stack exec -- hpc-codecov my-test-suite -o my-test-suite-codecov.json`
+1. Run your test with coverage, e.g. `stack test my-project:my-test-suite --coverage`
+1. Run `stack exec -- hpc-codecov my-project:my-test-suite -o my-test-suite-codecov.json`
 1. Upload the JSON file with your desired method, e.g. using the
    [Codecov Bash uploader](https://docs.codecov.io/docs/about-the-codecov-bash-uploader)
 
