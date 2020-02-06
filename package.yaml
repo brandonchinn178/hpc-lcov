@@ -62,4 +62,5 @@ tests:
       - tasty
       - tasty-discover
       - tasty-golden
+      - tasty-hunit
       - time

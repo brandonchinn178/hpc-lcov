@@ -1,16 +1,22 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module Codecov where
 
+import Control.Arrow ((&&&))
 import Data.Aeson (encode)
+import qualified Data.IntMap as IntMap
+import Data.Text (Text)
 import Data.Time (UTCTime(..), fromGregorian)
 import Test.Tasty (TestTree)
 import Test.Tasty.Golden (goldenVsString)
-import Trace.Hpc.Mix (BoxLabel(..), Mix(..))
+import Test.Tasty.HUnit (testCase, (@?=))
+import Trace.Hpc.Mix (BoxLabel(..), CondBox(..), Mix(..))
 import Trace.Hpc.Tix (TixModule(..))
 import Trace.Hpc.Util (toHpcPos)
 
 import Trace.Hpc.Codecov
+import Trace.Hpc.Codecov.Report (CodecovReport(..), FileReport(..), Hit(..))
 
 test_generate_codecov :: TestTree
 test_generate_codecov =
@@ -28,6 +34,44 @@ test_generate_codecov =
           [ TixEntry (1, 1) (1, 20) (TopLevelBox ["baz"]) 20
           ]
       ]
+
+test_generate_codecov_merge_hits :: TestTree
+test_generate_codecov_merge_hits = testCase "generateCodecovFromTix merge hits" $
+  let report = generateCodecovFromTix $ map mkTixMix
+        [ TixMix "WithPartial" "WithPartial.hs"
+            [ TixEntry (1, 1) (1, 5) (ExpBox True) 10
+            , TixEntry (1, 10) (1, 20) (ExpBox False) 0
+            ]
+        , TixMix "WithMissing" "WithMissing.hs"
+            [ TixEntry (1, 1) (1, 5) (ExpBox True) 0
+            , TixEntry (1, 10) (1, 20) (ExpBox False) 0
+            ]
+        , TixMix "WithMax" "WithMax.hs"
+            [ TixEntry (1, 1) (1, 5) (ExpBox True) 10
+            , TixEntry (1, 10) (1, 20) (ExpBox False) 20
+            ]
+        ]
+  in fromReport report @?=
+    [ ("WithPartial.hs", [(1, Partial)])
+    , ("WithMissing.hs", [(1, Hit 0)])
+    , ("WithMax.hs", [(1, Hit 20)])
+    ]
+
+test_generate_codecov_binbox :: TestTree
+test_generate_codecov_binbox = testCase "generateCodecovFromTix BinBox" $
+  let report = generateCodecovFromTix $ map mkTixMix
+        [ TixMix "WithBinBox" "WithBinBox.hs"
+            -- if [x > 0] then ... else ...
+            --    ^ evaluates to True 10 times, False 0 times
+            --    | should show in the report as "10 hits"
+            [ TixEntry (1, 1) (1, 10) (ExpBox True) 10
+            , TixEntry (1, 1) (1, 10) (BinBox CondBinBox True) 10
+            , TixEntry (1, 1) (1, 10) (BinBox CondBinBox False) 0
+            ]
+        ]
+  in fromReport report @?=
+    [ ("WithBinBox.hs", [(1, Hit 10)])
+    ]
 
 {- Helpers -}
 
@@ -56,3 +100,8 @@ mkTixMix TixMix{..} = (tixModule, mix)
       let (startLine, startCol) = tixEntryStartPos
           (endLine, endCol) = tixEntryEndPos
       in (toHpcPos (startLine, startCol, endLine, endCol), tixEntryBoxLabel)
+
+fromReport :: CodecovReport -> [(Text, [(Int, Hit)])]
+fromReport (CodecovReport fileReports) = map (fileName &&& getHits) fileReports
+  where
+    getHits = IntMap.toList . lineHits
