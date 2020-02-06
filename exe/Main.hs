@@ -85,7 +85,8 @@ getStackDistPath = readStack ["path", "--dist-dir"]
 getPackageDirectory :: String -> IO FilePath
 getPackageDirectory package = do
   stackConfigPath <- readStack ["path", "--config-location"]
-  stackConfig <- Yaml.decodeFileThrow stackConfigPath
+  stackConfig <- Yaml.decodeFileEither stackConfigPath >>=
+    either (\e -> fail $ "Could not decode file `" ++ stackConfigPath ++ "`: " ++ show e) return
 
   let isPackage dir = doesFileExist $ dir </> package <.> "cabal"
 
