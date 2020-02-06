@@ -14,6 +14,7 @@ import qualified Data.IntMap as IntMap
 import Data.Text (Text)
 import qualified Data.Text as Text
 
+-- https://docs.codecov.io/reference#section-codecov-json-report-format
 newtype CodecovReport = CodecovReport [FileReport]
   deriving (Show, Eq)
 
@@ -32,13 +33,11 @@ data FileReport = FileReport
   } deriving (Show, Eq)
 
 data Hit
-  = Hit Int
+  = Hit Int -- should never be negative
   | Partial
-      Int -- hit branches
-      Int -- total branches
   deriving (Show, Eq)
 
 instance ToJSON Hit where
   toJSON = \case
     Hit count -> toJSON count
-    Partial count total -> toJSON $ show count ++ "/" ++ show total
+    Partial -> toJSON ("1/2" :: String)

@@ -1,0 +1,15 @@
+name: minimal-example
+version: 0.1.0
+
+dependencies:
+  - base
+
+library:
+  source-dirs: src
+
+tests:
+  minimal-example-test:
+    source-dirs: test
+    main: Main.hs
+    dependencies:
+      - minimal-example

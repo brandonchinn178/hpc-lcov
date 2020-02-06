@@ -26,6 +26,9 @@ executors:
       STACK_YAML: << parameters.stack_yaml >>
       CI_LATEST: <<# parameters.latest >>1<</ parameters.latest >>
 
+orbs:
+  codecov: codecov/codecov@1.0.2
+
 jobs:
   run_build_and_test:
     parameters:
@@ -115,7 +118,23 @@ jobs:
                 path: .ci/
       - run:
           name: Test
-          command: stack test
+          command: |
+            # tasty-discover-3.0.2 does not discover all modules by default, but this
+            # flag is deprecated in newer versions
+            TEST_ARGS=()
+            if [[ "${STACK_YAML}" == "stack-ghc-8.0.yaml" ]]; then
+              TEST_ARGS+=(--ghc-options '-optF --no-module-suffix')
+            fi
+
+            stack test --coverage ${TEST_ARGS+"${TEST_ARGS[@]}"}
+      - when:
+          condition: << parameters.latest >>
+          steps:
+            - run:
+                name: Convert coverage output
+                command: stack exec -- hpc-codecov hpc-codecov:hpc-codecov-test -o coverage.json
+            - codecov/upload:
+                file: coverage.json
 
 workflows:
   version: 2
