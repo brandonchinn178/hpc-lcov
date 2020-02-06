@@ -26,6 +26,9 @@ executors:
       STACK_YAML: << parameters.stack_yaml >>
       CI_LATEST: <<# parameters.latest >>1<</ parameters.latest >>
 
+orbs:
+  codecov: codecov/codecov@1.0.2
+
 jobs:
   run_build_and_test:
     parameters:
@@ -115,7 +118,15 @@ jobs:
                 path: .ci/
       - run:
           name: Test
-          command: stack test
+          command: stack test --coverage
+      - when:
+          condition: << parameters.latest >>
+          steps:
+            - run:
+                name: Convert coverage output
+                command: stack exec -- hpc-codecov hpc-codecov:hpc-codecov-test -o coverage.json
+            - codecov/upload:
+                file: coverage.json
 
 workflows:
   version: 2
