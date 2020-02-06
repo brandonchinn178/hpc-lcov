@@ -2,6 +2,7 @@
 
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.Types as JSON
+import qualified Data.ByteString.Lazy as ByteString
 import Data.HashMap.Lazy ((!))
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as Opt
@@ -52,7 +53,7 @@ main = do
   mixFiles <- mapM (findMixFile mixDirectory) tixModules
 
   let report = generateCodecovFromTix $ zip tixModules mixFiles
-  JSON.encodeFile cliOutput report
+  ByteString.writeFile cliOutput $ JSON.encode report
 
 parseTarget :: String -> Maybe (String, String)
 parseTarget target = case break (== ':') target of
