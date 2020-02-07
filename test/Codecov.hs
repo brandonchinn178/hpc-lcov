@@ -21,32 +21,32 @@ import Trace.Hpc.Codecov.Report (CodecovReport(..), FileReport(..), Hit(..))
 test_generate_codecov :: TestTree
 test_generate_codecov =
   goldenVsString "generateCodecovFromTix" "test/golden/generate_codecov.golden" $
-    pure $ encode $ generateCodecovFromTix $ map mkTixMix
-      [ TixMix "src/MyModule/Foo.hs"
+    pure $ encode $ generateCodecovFromTixMix
+      [ TixMix "MyModule.Foo" "src/MyModule/Foo.hs"
           [ TixMixEntry (1, 1) (1, 20) (TopLevelBox ["foo"]) 0
           , TixMixEntry (2, 1) (2, 20) (ExpBox True) 1
           , TixMixEntry (3, 1) (3, 20) (ExpBox False) 2
           ]
-      , TixMix "src/MyModule/Bar.hs"
+      , TixMix "MyModule.Bar" "src/MyModule/Bar.hs"
           [ TixMixEntry (1, 1) (1, 20) (TopLevelBox ["bar"]) 10
           ]
-      , TixMix "src/MyModule/Bar/Baz.hs"
+      , TixMix "MyModule.Bar.Baz" "src/MyModule/Bar/Baz.hs"
           [ TixMixEntry (1, 1) (1, 20) (TopLevelBox ["baz"]) 20
           ]
       ]
 
 test_generate_codecov_merge_hits :: TestTree
 test_generate_codecov_merge_hits = testCase "generateCodecovFromTix merge hits" $
-  let report = generateCodecovFromTix $ map mkTixMix
-        [ TixMix "WithPartial.hs"
+  let report = generateCodecovFromTixMix
+        [ TixMix "WithPartial" "WithPartial.hs"
             [ TixMixEntry (1, 1) (1, 5) (ExpBox True) 10
             , TixMixEntry (1, 10) (1, 20) (ExpBox False) 0
             ]
-        , TixMix "WithMissing.hs"
+        , TixMix "WithMissing" "WithMissing.hs"
             [ TixMixEntry (1, 1) (1, 5) (ExpBox True) 0
             , TixMixEntry (1, 10) (1, 20) (ExpBox False) 0
             ]
-        , TixMix "WithMax.hs"
+        , TixMix "WithMax" "WithMax.hs"
             [ TixMixEntry (1, 1) (1, 5) (ExpBox True) 10
             , TixMixEntry (1, 10) (1, 20) (ExpBox False) 20
             ]
@@ -59,8 +59,8 @@ test_generate_codecov_merge_hits = testCase "generateCodecovFromTix merge hits" 
 
 test_generate_codecov_binbox :: TestTree
 test_generate_codecov_binbox = testCase "generateCodecovFromTix BinBox" $
-  let report = generateCodecovFromTix $ map mkTixMix
-        [ TixMix "WithBinBox.hs"
+  let report = generateCodecovFromTixMix
+        [ TixMix "WithBinBox" "WithBinBox.hs"
             -- if [x > 0] then ... else ...
             --    ^ evaluates to True 10 times, False 0 times
             --    | should show in the report as "10 hits"
@@ -75,8 +75,8 @@ test_generate_codecov_binbox = testCase "generateCodecovFromTix BinBox" $
 
 {- Helpers -}
 
-mkTix :: [Integer] -> TixModule
-mkTix ticks = TixModule "A.B.C" 0 (length ticks) ticks
+mkTix :: String -> [Integer] -> TixModule
+mkTix moduleName ticks = TixModule moduleName 0 (length ticks) ticks
 
 data MixEntry = MixEntry
   { mixEntryStartPos :: (Int, Int)
@@ -94,7 +94,8 @@ mkMix filePath mixEntries = Mix filePath updateTime 0 (length mixs) mixs
       in (toHpcPos (startLine, startCol, endLine, endCol), mixEntryBoxLabel)
 
 data TixMix = TixMix
-  { tixMixFilePath :: FilePath
+  { tixMixModule   :: String
+  , tixMixFilePath :: FilePath
   , tixMixEntries  :: [TixMixEntry]
   }
 
@@ -105,12 +106,15 @@ data TixMixEntry = TixMixEntry
   , tixMixEntryTicks    :: Integer
   }
 
-mkTixMix :: TixMix -> (TixModule, Mix)
-mkTixMix TixMix{..} = (mkTix ticks, mkMix tixMixFilePath mixEntries)
+generateCodecovFromTixMix :: [TixMix] -> CodecovReport
+generateCodecovFromTixMix = uncurry generateCodecovFromTix . unzip . map fromTixMix
   where
-    ticks = map tixMixEntryTicks tixMixEntries
-    mixEntries = flip map tixMixEntries $
-      \(TixMixEntry start end boxLabel _) -> MixEntry start end boxLabel
+    fromTixMix TixMix{..} =
+      let mixEntries = flip map tixMixEntries $
+            \(TixMixEntry start end boxLabel _) -> MixEntry start end boxLabel
+          moduleToMix = (tixMixModule, mkMix tixMixFilePath mixEntries)
+          tix = mkTix tixMixModule $ map tixMixEntryTicks tixMixEntries
+      in (moduleToMix, tix)
 
 fromReport :: CodecovReport -> [(Text, [(Int, Hit)])]
 fromReport (CodecovReport fileReports) = map (fileName &&& getHits) fileReports

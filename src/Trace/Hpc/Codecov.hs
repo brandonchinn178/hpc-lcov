@@ -6,21 +6,28 @@ module Trace.Hpc.Codecov
 
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
 import Trace.Hpc.Mix (BoxLabel(..), Mix(..), MixEntry)
-import Trace.Hpc.Tix (TixModule, tixModuleTixs)
+import Trace.Hpc.Tix (TixModule, tixModuleName, tixModuleTixs)
 import Trace.Hpc.Util (fromHpcPos)
 
 import Trace.Hpc.Codecov.Report (CodecovReport(..), FileReport(..), Hit(..))
 
 -- | Generate Codecov JSON format from HPC coverage data.
 generateCodecovFromTix
-  :: [(TixModule, Mix)] -- ^ The TixModule paired with their corresponding .mix file
+  :: [(String, Mix)] -- ^ Mapping from module name to .mix file
+  -> [TixModule]
   -> CodecovReport
-generateCodecovFromTix = CodecovReport . map mkFileReport
+generateCodecovFromTix moduleToMix = CodecovReport . map mkFileReport
   where
-    mkFileReport (tixModule, Mix fileLoc _ _ _ mixEntries) =
+    mkFileReport tixModule =
       let tickCounts = tixModuleTixs tixModule
+          moduleName = tixModuleName tixModule
+          Mix fileLoc _ _ _ mixEntries =
+            fromMaybe
+              (error $ "Could not find .mix file for: " ++ moduleName)
+              $ moduleName `lookup` moduleToMix
       in FileReport (Text.pack fileLoc) (mkLineHits $ zip mixEntries tickCounts)
 
 type LineNum = Int
