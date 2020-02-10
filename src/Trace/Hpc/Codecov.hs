@@ -5,7 +5,7 @@ module Trace.Hpc.Codecov
   ) where
 
 import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
+import qualified Data.IntMap.Strict as IntMap
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
 import Trace.Hpc.Mix (BoxLabel(..), Mix(..), MixEntry)
@@ -30,11 +30,10 @@ generateCodecovFromTix moduleToMix = CodecovReport . map mkFileReport
               $ moduleName `lookup` moduleToMix
       in FileReport (Text.pack fileLoc) (mkLineHits $ zip mixEntries tickCounts)
 
-type LineNum = Int
 type TickCount = Integer
 
 mkLineHits :: [(MixEntry, TickCount)] -> IntMap Hit
-mkLineHits = IntMap.fromListWith resolveHits . concatMap (uncurry applyTickCountToLines)
+mkLineHits = IntMap.unionsWith resolveHits . map (uncurry applyTickCountToLines)
   where
     -- combines the hits for each box on a given line
     resolveHits (Hit 0) (Hit 0) = Hit 0
@@ -42,8 +41,8 @@ mkLineHits = IntMap.fromListWith resolveHits . concatMap (uncurry applyTickCount
     resolveHits _ _ = Partial
 
 -- | For every line in the given MixEntry, pair it with the number of hits this MixEntry got.
-applyTickCountToLines :: MixEntry -> TickCount -> [(LineNum, Hit)]
-applyTickCountToLines (hpcPos, boxLabel) tickCount = map (, hit) boxLines
+applyTickCountToLines :: MixEntry -> TickCount -> IntMap Hit
+applyTickCountToLines (hpcPos, boxLabel) tickCount = IntMap.fromList $ map (, hit) boxLines
   where
     hit = Hit $ fromInteger tickCount
     (lineStart, _, lineEnd, _) = fromHpcPos hpcPos
