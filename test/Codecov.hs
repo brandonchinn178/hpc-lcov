@@ -35,8 +35,8 @@ test_generate_codecov =
           ]
       ]
 
-test_generate_codecov_merge_hits :: TestTree
-test_generate_codecov_merge_hits = testCase "generateCodecovFromTix merge hits" $
+test_generate_codecov_resolve_hits :: TestTree
+test_generate_codecov_resolve_hits = testCase "generateCodecovFromTix resolve hits" $
   let report = generateCodecovFromTixMix
         [ TixMix "WithPartial" "WithPartial.hs"
             [ TixMixEntry (1, 1) (1, 5) (ExpBox True) 10
@@ -46,15 +46,26 @@ test_generate_codecov_merge_hits = testCase "generateCodecovFromTix merge hits" 
             [ TixMixEntry (1, 1) (1, 5) (ExpBox True) 0
             , TixMixEntry (1, 10) (1, 20) (ExpBox False) 0
             ]
-        , TixMix "WithMax" "WithMax.hs"
+        , TixMix "WithDisjoint" "WithDisjoint.hs"
             [ TixMixEntry (1, 1) (1, 5) (ExpBox True) 10
             , TixMixEntry (1, 10) (1, 20) (ExpBox False) 20
+            ]
+        , TixMix "WithNonDisjoint" "WithNonDisjoint.hs"
+            [ TixMixEntry (1, 1) (5, 20) (TopLevelBox ["foo"]) 20 -- contains all below
+            , TixMixEntry (1, 1) (1, 5) (ExpBox False) 10
+            , TixMixEntry (3, 1) (3, 5) (ExpBox False) 0
+            , TixMixEntry (4, 1) (4, 5) (ExpBox False) 20
+            , TixMixEntry (4, 6) (4, 20) (ExpBox False) 0
+            , TixMixEntry (5, 1) (5, 5) (ExpBox False) 10
+            , TixMixEntry (5, 6) (5, 10) (ExpBox False) 20
+            , TixMixEntry (5, 1) (5, 20) (LocalBox ["foo", "bar"]) 10 -- contains the two above
             ]
         ]
   in fromReport report @?=
     [ ("WithPartial.hs", [(1, Partial)])
     , ("WithMissing.hs", [(1, Hit 0)])
-    , ("WithMax.hs", [(1, Hit 20)])
+    , ("WithDisjoint.hs", [(1, Hit 20)])
+    , ("WithNonDisjoint.hs", [(1, Hit 10), (2, Hit 20), (3, Hit 0), (4, Partial), (5, Hit 20)])
     ]
 
 test_generate_codecov_binbox :: TestTree
