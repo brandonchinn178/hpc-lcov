@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 
+import Control.Monad (forM)
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.Types as JSON
 import qualified Data.ByteString.Lazy as ByteString
@@ -11,7 +12,7 @@ import System.FilePath (takeDirectory, (<.>), (</>))
 import System.Process (readProcess)
 import Trace.Hpc.Codecov (generateCodecovFromTix)
 import Trace.Hpc.Mix (Mix, readMix)
-import Trace.Hpc.Tix (Tix(..), TixModule, readTix)
+import Trace.Hpc.Tix (Tix(..), TixModule, readTix, tixModuleName)
 
 data CLIOptions = CLIOptions
   { cliTarget :: String
@@ -50,9 +51,12 @@ main = do
     maybe (fail $ "Could not find tix file: " ++ show tixFilePath) return
 
   mixDirectory <- getMixDirectory packageName
-  mixFiles <- mapM (findMixFile mixDirectory) tixModules
+  moduleToMix <- forM tixModules $ \tixModule -> do
+    mixFile <- findMixFile mixDirectory tixModule
+    return (tixModuleName tixModule, mixFile)
 
-  let report = generateCodecovFromTix $ zip tixModules mixFiles
+  let report = generateCodecovFromTix moduleToMix tixModules
+
   ByteString.writeFile cliOutput $ JSON.encode report
 
 parseTarget :: String -> Maybe (String, String)
