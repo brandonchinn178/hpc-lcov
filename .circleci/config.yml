@@ -137,7 +137,7 @@ jobs:
           steps:
             - run:
                 name: Convert coverage output
-                command: stack exec -- hpc-codecov hpc-codecov:hpc-codecov-test -o coverage.json
+                command: stack exec -- hpc-codecov hpc-codecov:hpc-codecov-test
             - codecov/upload:
                 file: coverage.json
 

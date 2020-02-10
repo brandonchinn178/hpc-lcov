@@ -34,7 +34,8 @@ getCLIOptions = Opt.execParser
       [ Opt.long "output"
       , Opt.short 'o'
       , Opt.metavar "FILE"
-      , Opt.help "The file to save coverage information"
+      , Opt.help "The file to save coverage information (default: coverage.json)"
+      , Opt.value "coverage.json"
       ]
 
     description = "Convert HPC coverage output into Codecov JSON coverage format"
