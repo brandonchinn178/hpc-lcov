@@ -6,6 +6,7 @@ module Codecov where
 import Control.Arrow ((&&&))
 import Data.Aeson (encode)
 import qualified Data.IntMap as IntMap
+import Data.List (sortOn)
 import Data.Text (Text)
 import Data.Time (UTCTime(..), fromGregorian)
 import Test.Tasty (TestTree)
@@ -62,10 +63,10 @@ test_generate_codecov_resolve_hits = testCase "generateCodecovFromTix resolve hi
             ]
         ]
   in fromReport report @?=
-    [ ("WithPartial.hs", [(1, Partial)])
+    [ ("WithDisjoint.hs", [(1, Hit 20)])
     , ("WithMissing.hs", [(1, Hit 0)])
-    , ("WithDisjoint.hs", [(1, Hit 20)])
     , ("WithNonDisjoint.hs", [(1, Hit 10), (2, Hit 20), (3, Hit 0), (4, Partial), (5, Hit 20)])
+    , ("WithPartial.hs", [(1, Partial)])
     ]
 
 test_generate_codecov_non_expbox :: TestTree
@@ -102,8 +103,8 @@ test_generate_codecov_non_expbox = testCase "generateCodecovFromTix non-ExpBox" 
         ]
   in fromReport report @?=
     [ ("WithBinBox.hs", [(1, Hit 10)])
-    , ("WithTopLevelBox.hs", [(1, Hit 0), (2, Hit 1)])
     , ("WithLocalBox.hs", [(1, Hit 1)])
+    , ("WithTopLevelBox.hs", [(1, Hit 0), (2, Hit 1)])
     ]
 
 {- Helpers -}
@@ -148,6 +149,6 @@ generateCodecovFromTixMix = uncurry generateCodecovFromTix . unzip . map fromTix
       in (moduleToMix, tix)
 
 fromReport :: CodecovReport -> [(Text, [(Int, Hit)])]
-fromReport (CodecovReport fileReports) = map (fileName &&& getHits) fileReports
+fromReport (CodecovReport fileReports) = sortOn fst $ map (fileName &&& getHits) fileReports
   where
     getHits = IntMap.toList . lineHits
