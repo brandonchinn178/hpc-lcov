@@ -4,13 +4,15 @@ module Trace.Hpc.Codecov
   ( generateCodecovFromTix
   ) where
 
+import Control.Arrow ((&&&))
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.List (foldl', foldl1')
+import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Text as Text
 import Trace.Hpc.Mix (BoxLabel(..), Mix(..), MixEntry)
-import Trace.Hpc.Tix (TixModule, tixModuleName, tixModuleTixs)
+import Trace.Hpc.Tix (TixModule(..), tixModuleName, tixModuleTixs)
 import Trace.Hpc.Util (HpcPos, fromHpcPos, insideHpcPos)
 
 import Trace.Hpc.Codecov.Report (CodecovReport(..), FileReport(..), Hit(..))
@@ -20,7 +22,7 @@ generateCodecovFromTix
   :: [(String, Mix)] -- ^ Mapping from module name to .mix file
   -> [TixModule]
   -> CodecovReport
-generateCodecovFromTix moduleToMix = CodecovReport . map mkFileReport
+generateCodecovFromTix moduleToMix = CodecovReport . map mkFileReport . mergeTixModules
   where
     mkFileReport tixModule =
       let tickCounts = tixModuleTixs tixModule
@@ -30,6 +32,16 @@ generateCodecovFromTix moduleToMix = CodecovReport . map mkFileReport
               (error $ "Could not find .mix file for: " ++ moduleName)
               $ moduleName `lookup` moduleToMix
       in FileReport (Text.pack fileLoc) (mkLineHits $ zip mixEntries tickCounts)
+
+-- | Merge all tix modules representing the same module.
+--
+-- If tix modules are duplicated, we are treating them as being hit in different test suites, so all
+-- tick counts should be added together.
+mergeTixModules :: [TixModule] -> [TixModule]
+mergeTixModules = Map.elems . Map.fromListWith mergeTixs . map (tixModuleName &&& id)
+  where
+    mergeTixs (TixModule moduleName hash len ticks1) (TixModule _ _ _ ticks2) =
+      TixModule moduleName hash len $ zipWith (+) ticks1 ticks2
 
 type TickCount = Integer
 
