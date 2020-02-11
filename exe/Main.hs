@@ -12,7 +12,7 @@ import qualified Options.Applicative as Opt
 import System.FilePath (takeDirectory, (<.>), (</>))
 import System.Process (readProcess)
 import Trace.Hpc.Codecov (generateCodecovFromTix)
-import Trace.Hpc.Mix (readMix)
+import Trace.Hpc.Mix (Mix(..), readMix)
 import Trace.Hpc.Tix (Tix(..), readTix, tixModuleName)
 
 data CLIOptions = CLIOptions
@@ -58,8 +58,8 @@ main = do
   mixDirectories <- getMixDirectories
 
   moduleToMixList <- forM tixModules $ \tixModule -> do
-    mixFile <- readMix mixDirectories (Right tixModule)
-    return (tixModuleName tixModule, mixFile)
+    Mix fileLoc _ _ _ mixEntries <- readMix mixDirectories (Right tixModule)
+    return (tixModuleName tixModule, (fileLoc, mixEntries))
 
   let moduleToMix = Map.toList . Map.fromListWith checkDupeMix $ moduleToMixList
       checkDupeMix mix1 mix2 = if mix1 == mix2

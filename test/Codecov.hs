@@ -8,7 +8,6 @@ import Data.Aeson (encode)
 import qualified Data.IntMap as IntMap
 import Data.List (sortOn)
 import Data.Text (Text)
-import Data.Time (UTCTime(..), fromGregorian)
 import Test.Tasty (TestTree)
 import Test.Tasty.Golden (goldenVsString)
 import Test.Tasty.HUnit (testCase, (@?=))
@@ -118,10 +117,9 @@ data MixEntry = MixEntry
   , mixEntryBoxLabel :: BoxLabel
   }
 
-mkModuleToMix :: String -> FilePath -> [MixEntry] -> (String, Mix)
-mkModuleToMix moduleName filePath mixEntries = (moduleName, Mix filePath updateTime 0 (length mixs) mixs)
+mkModuleToMix :: String -> FilePath -> [MixEntry] -> (String, FileInfo)
+mkModuleToMix moduleName filePath mixEntries = (moduleName, (filePath, mixs))
   where
-    updateTime = UTCTime (fromGregorian 1970 1 1) 0
     mixs = flip map mixEntries $ \MixEntry{..} ->
       let (startLine, startCol) = mixEntryStartPos
           (endLine, endCol) = mixEntryEndPos
