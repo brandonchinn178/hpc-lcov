@@ -95,8 +95,8 @@ data MixEntry = MixEntry
   , mixEntryBoxLabel :: BoxLabel
   }
 
-mkMix :: FilePath -> [MixEntry] -> Mix
-mkMix filePath mixEntries = Mix filePath updateTime 0 (length mixs) mixs
+mkModuleToMix :: String -> FilePath -> [MixEntry] -> (String, Mix)
+mkModuleToMix moduleName filePath mixEntries = (moduleName, Mix filePath updateTime 0 (length mixs) mixs)
   where
     updateTime = UTCTime (fromGregorian 1970 1 1) 0
     mixs = flip map mixEntries $ \MixEntry{..} ->
@@ -121,9 +121,8 @@ generateCodecovFromTixMix :: [TixMix] -> CodecovReport
 generateCodecovFromTixMix = uncurry generateCodecovFromTix . unzip . map fromTixMix
   where
     fromTixMix TixMix{..} =
-      let mixEntries = flip map tixMixEntries $
-            \(TixMixEntry start end boxLabel _) -> MixEntry start end boxLabel
-          moduleToMix = (tixMixModule, mkMix tixMixFilePath mixEntries)
+      let toMixEntry (TixMixEntry start end boxLabel _) = MixEntry start end boxLabel
+          moduleToMix = mkModuleToMix tixMixModule tixMixFilePath $ map toMixEntry tixMixEntries
           tix = mkTix tixMixModule $ map tixMixEntryTicks tixMixEntries
       in (moduleToMix, tix)
 
