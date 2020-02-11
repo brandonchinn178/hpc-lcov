@@ -7,7 +7,7 @@ module Trace.Hpc.Codecov
 import Data.IntMap (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.List (foldl', foldl1')
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Text as Text
 import Trace.Hpc.Mix (BoxLabel(..), Mix(..), MixEntry)
 import Trace.Hpc.Tix (TixModule, tixModuleName, tixModuleTixs)
@@ -43,7 +43,7 @@ type TickCount = Integer
 --      (b) Some hits are zero, in which case, the line has a PARTIAL hit
 --      (c) No hits are zero, in which case, keep the maximum hit
 mkLineHits :: [(MixEntry, TickCount)] -> IntMap Hit
-mkLineHits = fmap resolveHits . concatIntMaps . map (uncurry applyTickCountToLines)
+mkLineHits = fmap resolveHits . concatIntMaps . map (uncurry getLineHits) . filterMixEntries
   where
     -- N.B. IntMap list is guaranteed to be non-empty
     concatIntMaps :: [IntMap v] -> IntMap [v]
@@ -58,17 +58,28 @@ mkLineHits = fmap resolveHits . concatIntMaps . map (uncurry applyTickCountToLin
     resolveDisjointHits (Hit x) (Hit y) | x /= 0 && y /= 0 = Hit $ max x y
     resolveDisjointHits _ _ = Partial
 
--- | For every line in the given MixEntry, pair it with the number of hits this MixEntry got.
-applyTickCountToLines :: MixEntry -> TickCount -> IntMap (Hit, HpcPos)
-applyTickCountToLines (hpcPos, boxLabel) tickCount = IntMap.fromList $ map (, (hit, hpcPos)) boxLines
+-- | Get hits per line in the given HpcPos.
+getLineHits :: HpcPos -> TickCount -> IntMap (Hit, HpcPos)
+getLineHits hpcPos tickCount = IntMap.fromList $ map (, (hit, hpcPos)) [lineStart..lineEnd]
   where
     hit = Hit $ fromInteger tickCount
     (lineStart, _, lineEnd, _) = fromHpcPos hpcPos
-    boxLines = case boxLabel of
-      -- BinBox specifies a box that evaluates to a Bool and counts the number of times the box
-      -- evaluates to True/False. We don't care about this information for codecov.
-      BinBox _ _ -> []
-      _ -> [lineStart..lineEnd]
+
+-- | Filter out mix entries that should not be included in the coverage report.
+filterMixEntries :: [(MixEntry, TickCount)] -> [(HpcPos, TickCount)]
+filterMixEntries = mapMaybe $ \((hpcPos, boxLabel), tickCount) ->
+  case boxLabel of
+    ExpBox _ -> Just (hpcPos, tickCount)
+
+    -- BinBox specifies a box that evaluates to a Bool and counts the number of times the box
+    -- evaluates to True/False. We don't care about this information for codecov.
+    BinBox _ _ -> Nothing
+
+    -- TopLevelBox/LocalBox specifies boxes counting the number of times a function has been hit.
+    -- Codecov doesn't care about this, just use the number of times each expression in the function
+    -- was hit.
+    TopLevelBox _ -> Nothing
+    LocalBox _ -> Nothing
 
 -- see point (1) in mkLineHits
 --
