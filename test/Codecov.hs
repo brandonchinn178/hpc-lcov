@@ -68,8 +68,8 @@ test_generate_codecov_resolve_hits = testCase "generateCodecovFromTix resolve hi
     , ("WithNonDisjoint.hs", [(1, Hit 10), (2, Hit 20), (3, Hit 0), (4, Partial), (5, Hit 20)])
     ]
 
-test_generate_codecov_binbox :: TestTree
-test_generate_codecov_binbox = testCase "generateCodecovFromTix BinBox" $
+test_generate_codecov_non_expbox :: TestTree
+test_generate_codecov_non_expbox = testCase "generateCodecovFromTix non-ExpBox" $
   let report = generateCodecovFromTix
         [ mkModuleToMix "WithBinBox" "WithBinBox.hs"
             -- if [x > 0] then ... else ...
@@ -80,11 +80,30 @@ test_generate_codecov_binbox = testCase "generateCodecovFromTix BinBox" $
             , MixEntry (1, 1) (1, 10) (BinBox CondBinBox True)
             , MixEntry (1, 1) (1, 10) (BinBox CondBinBox False)
             ]
+        , mkModuleToMix "WithTopLevelBox" "WithTopLevelBox.hs"
+            -- foo x = ...
+            -- ^
+            [ MixEntry (1, 1) (2, 10) (TopLevelBox ["foo"])
+            , MixEntry (1, 1) (1, 5) (ExpBox True)
+            , MixEntry (2, 6) (2, 10) (ExpBox True)
+            ]
+        , mkModuleToMix "WithLocalBox" "WithLocalBox.hs"
+            -- foo x = ...
+            --   where bar = ...
+            --         ^
+            [ MixEntry (1, 1) (1, 10) (LocalBox ["foo", "bar"])
+            , MixEntry (1, 1) (1, 5) (ExpBox True)
+            , MixEntry (1, 6) (1, 10) (ExpBox True)
+            ]
         ]
         [ mkTix "WithBinBox" [10, 10, 0]
+        , mkTix "WithTopLevelBox" [1, 0, 1]
+        , mkTix "WithLocalBox" [1, 1, 1]
         ]
   in fromReport report @?=
     [ ("WithBinBox.hs", [(1, Hit 10)])
+    , ("WithTopLevelBox.hs", [(1, Hit 0), (2, Hit 1)])
+    , ("WithLocalBox.hs", [(1, Hit 1)])
     ]
 
 {- Helpers -}
