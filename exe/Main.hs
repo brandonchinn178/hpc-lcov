@@ -5,6 +5,8 @@ import qualified Data.Aeson as JSON
 import qualified Data.Aeson.Types as JSON
 import qualified Data.ByteString.Lazy as ByteString
 import Data.HashMap.Lazy ((!))
+import Data.List (intercalate)
+import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as Opt
 import System.Directory (doesFileExist)
@@ -15,8 +17,8 @@ import Trace.Hpc.Mix (Mix, readMix)
 import Trace.Hpc.Tix (Tix(..), TixModule, readTix, tixModuleName)
 
 data CLIOptions = CLIOptions
-  { cliTarget :: String
-  , cliOutput :: FilePath
+  { cliTargets :: [String]
+  , cliOutput  :: FilePath
   }
 
 getCLIOptions :: IO CLIOptions
@@ -24,11 +26,11 @@ getCLIOptions = Opt.execParser
   $ Opt.info (Opt.helper <*> parseCLIOptions) $ Opt.progDesc description
   where
     parseCLIOptions = CLIOptions
-      <$> parseCLITarget
+      <$> parseCLITargets
       <*> parseCLIOutput
-    parseCLITarget = Opt.strArgument $ mconcat
+    parseCLITargets = Opt.many $ Opt.strArgument $ mconcat
       [ Opt.metavar "TARGET"
-      , Opt.help "The test-suite to get coverage information for, as `package:test-suite`"
+      , Opt.help "The test-suite(s) to get coverage information for, as `package:test-suite`"
       ]
     parseCLIOutput = Opt.strOption $ mconcat
       [ Opt.long "output"
@@ -44,19 +46,28 @@ main :: IO ()
 main = do
   CLIOptions{..} <- getCLIOptions
 
-  (packageName, testName) <- maybe (fail $ "Invalid target: " ++ cliTarget) return
-    $ parseTarget cliTarget
+  packages <- case partitionMaybes parseTarget cliTargets of
+    (packages, []) -> return packages
+    (_, missing) -> fail $ "Invalid target(s): " ++ intercalate ", " missing
 
-  tixFilePath <- getTixFilePath packageName testName
-  Tix tixModules <- readTix tixFilePath >>=
-    maybe (fail $ "Could not find tix file: " ++ show tixFilePath) return
+  (moduleToMixList, tixModulesList) <- fmap unzip $ forM packages $ \(packageName, testName) -> do
+    tixFilePath <- getTixFilePath packageName testName
+    Tix tixModules <- readTix tixFilePath >>=
+      maybe (fail $ "Could not find tix file: " ++ show tixFilePath) return
 
-  mixDirectory <- getMixDirectory packageName
-  moduleToMix <- forM tixModules $ \tixModule -> do
-    mixFile <- findMixFile mixDirectory tixModule
-    return (tixModuleName tixModule, mixFile)
+    mixDirectory <- getMixDirectory packageName
+    moduleToMix <- forM tixModules $ \tixModule -> do
+      mixFile <- findMixFile mixDirectory tixModule
+      return (tixModuleName tixModule, mixFile)
 
-  let report = generateCodecovFromTix moduleToMix tixModules
+    return (moduleToMix, tixModules)
+
+  let tixModules = concat tixModulesList
+      moduleToMix = Map.toList . Map.fromListWith checkDupeMix . concat $ moduleToMixList
+      checkDupeMix mix1 mix2 = if mix1 == mix2
+        then mix1
+        else error $ ".mix files differ: " ++ show (mix1, mix2)
+      report = generateCodecovFromTix moduleToMix tixModules
 
   ByteString.writeFile cliOutput $ JSON.encode report
 
@@ -116,3 +127,12 @@ findM f = go
       if cond
         then return $ Just x
         else go xs
+
+partitionMaybes :: (a -> Maybe b) -> [a] -> ([b], [a])
+partitionMaybes f = go [] []
+  where
+    go justs nothings [] = (reverse justs, reverse nothings)
+    go justs nothings (a:as) =
+      case f a of
+        Just b -> go (b:justs) nothings as
+        Nothing -> go justs (a:nothings) as
