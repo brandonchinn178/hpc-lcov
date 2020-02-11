@@ -23,54 +23,87 @@ test_generate_codecov =
   goldenVsString "generateCodecovFromTix" "test/golden/generate_codecov.golden" $
     pure $ encode $ generateCodecovFromTixMix
       [ TixMix "MyModule.Foo" "src/MyModule/Foo.hs"
-          [ TixMixEntry (1, 1) (1, 20) (TopLevelBox ["foo"]) 0
-          , TixMixEntry (2, 1) (2, 20) (ExpBox True) 1
-          , TixMixEntry (3, 1) (3, 20) (ExpBox False) 2
+          [ TixMixEntry (1, 1) (1, 20) 0
+          , TixMixEntry (2, 1) (2, 20) 1
+          , TixMixEntry (3, 1) (3, 20) 2
           ]
       , TixMix "MyModule.Bar" "src/MyModule/Bar.hs"
-          [ TixMixEntry (1, 1) (1, 20) (TopLevelBox ["bar"]) 10
+          [ TixMixEntry (1, 1) (1, 20) 10
           ]
       , TixMix "MyModule.Bar.Baz" "src/MyModule/Bar/Baz.hs"
-          [ TixMixEntry (1, 1) (1, 20) (TopLevelBox ["baz"]) 20
+          [ TixMixEntry (1, 1) (1, 20) 20
           ]
       ]
 
-test_generate_codecov_merge_hits :: TestTree
-test_generate_codecov_merge_hits = testCase "generateCodecovFromTix merge hits" $
+test_generate_codecov_resolve_hits :: TestTree
+test_generate_codecov_resolve_hits = testCase "generateCodecovFromTix resolve hits" $
   let report = generateCodecovFromTixMix
         [ TixMix "WithPartial" "WithPartial.hs"
-            [ TixMixEntry (1, 1) (1, 5) (ExpBox True) 10
-            , TixMixEntry (1, 10) (1, 20) (ExpBox False) 0
+            [ TixMixEntry (1, 1) (1, 5) 10
+            , TixMixEntry (1, 10) (1, 20) 0
             ]
         , TixMix "WithMissing" "WithMissing.hs"
-            [ TixMixEntry (1, 1) (1, 5) (ExpBox True) 0
-            , TixMixEntry (1, 10) (1, 20) (ExpBox False) 0
+            [ TixMixEntry (1, 1) (1, 5) 0
+            , TixMixEntry (1, 10) (1, 20) 0
             ]
-        , TixMix "WithMax" "WithMax.hs"
-            [ TixMixEntry (1, 1) (1, 5) (ExpBox True) 10
-            , TixMixEntry (1, 10) (1, 20) (ExpBox False) 20
+        , TixMix "WithDisjoint" "WithDisjoint.hs"
+            [ TixMixEntry (1, 1) (1, 5) 10
+            , TixMixEntry (1, 10) (1, 20) 20
+            ]
+        , TixMix "WithNonDisjoint" "WithNonDisjoint.hs"
+            [ TixMixEntry (1, 1) (5, 20) 20 -- contains all below
+            , TixMixEntry (1, 1) (1, 5) 10
+            , TixMixEntry (3, 1) (3, 5) 0
+            , TixMixEntry (4, 1) (4, 5) 20
+            , TixMixEntry (4, 6) (4, 20) 0
+            , TixMixEntry (5, 1) (5, 5) 10
+            , TixMixEntry (5, 6) (5, 10) 20
+            , TixMixEntry (5, 1) (5, 20) 10 -- contains the two above
             ]
         ]
   in fromReport report @?=
     [ ("WithPartial.hs", [(1, Partial)])
     , ("WithMissing.hs", [(1, Hit 0)])
-    , ("WithMax.hs", [(1, Hit 20)])
+    , ("WithDisjoint.hs", [(1, Hit 20)])
+    , ("WithNonDisjoint.hs", [(1, Hit 10), (2, Hit 20), (3, Hit 0), (4, Partial), (5, Hit 20)])
     ]
 
-test_generate_codecov_binbox :: TestTree
-test_generate_codecov_binbox = testCase "generateCodecovFromTix BinBox" $
-  let report = generateCodecovFromTixMix
-        [ TixMix "WithBinBox" "WithBinBox.hs"
+test_generate_codecov_non_expbox :: TestTree
+test_generate_codecov_non_expbox = testCase "generateCodecovFromTix non-ExpBox" $
+  let report = generateCodecovFromTix
+        [ mkModuleToMix "WithBinBox" "WithBinBox.hs"
             -- if [x > 0] then ... else ...
             --    ^ evaluates to True 10 times, False 0 times
-            --    | should show in the report as "10 hits"
-            [ TixMixEntry (1, 1) (1, 10) (ExpBox True) 10
-            , TixMixEntry (1, 1) (1, 10) (BinBox CondBinBox True) 10
-            , TixMixEntry (1, 1) (1, 10) (BinBox CondBinBox False) 0
+            --      should show in the report as "10 hits", not
+            --      as "partial"
+            [ MixEntry (1, 1) (1, 10) (ExpBox True)
+            , MixEntry (1, 1) (1, 10) (BinBox CondBinBox True)
+            , MixEntry (1, 1) (1, 10) (BinBox CondBinBox False)
             ]
+        , mkModuleToMix "WithTopLevelBox" "WithTopLevelBox.hs"
+            -- foo x = ...
+            -- ^
+            [ MixEntry (1, 1) (2, 10) (TopLevelBox ["foo"])
+            , MixEntry (1, 1) (1, 5) (ExpBox True)
+            , MixEntry (2, 6) (2, 10) (ExpBox True)
+            ]
+        , mkModuleToMix "WithLocalBox" "WithLocalBox.hs"
+            -- foo x = ...
+            --   where bar = ...
+            --         ^
+            [ MixEntry (1, 1) (1, 10) (LocalBox ["foo", "bar"])
+            , MixEntry (1, 1) (1, 5) (ExpBox True)
+            , MixEntry (1, 6) (1, 10) (ExpBox True)
+            ]
+        ]
+        [ mkTix "WithBinBox" [10, 10, 0]
+        , mkTix "WithTopLevelBox" [1, 0, 1]
+        , mkTix "WithLocalBox" [1, 1, 1]
         ]
   in fromReport report @?=
     [ ("WithBinBox.hs", [(1, Hit 10)])
+    , ("WithTopLevelBox.hs", [(1, Hit 0), (2, Hit 1)])
+    , ("WithLocalBox.hs", [(1, Hit 1)])
     ]
 
 {- Helpers -}
@@ -84,8 +117,8 @@ data MixEntry = MixEntry
   , mixEntryBoxLabel :: BoxLabel
   }
 
-mkMix :: FilePath -> [MixEntry] -> Mix
-mkMix filePath mixEntries = Mix filePath updateTime 0 (length mixs) mixs
+mkModuleToMix :: String -> FilePath -> [MixEntry] -> (String, Mix)
+mkModuleToMix moduleName filePath mixEntries = (moduleName, Mix filePath updateTime 0 (length mixs) mixs)
   where
     updateTime = UTCTime (fromGregorian 1970 1 1) 0
     mixs = flip map mixEntries $ \MixEntry{..} ->
@@ -102,7 +135,6 @@ data TixMix = TixMix
 data TixMixEntry = TixMixEntry
   { tixMixEntryStartPos :: (Int, Int)
   , tixMixEntryEndPos   :: (Int, Int)
-  , tixMixEntryBoxLabel :: BoxLabel
   , tixMixEntryTicks    :: Integer
   }
 
@@ -110,9 +142,8 @@ generateCodecovFromTixMix :: [TixMix] -> CodecovReport
 generateCodecovFromTixMix = uncurry generateCodecovFromTix . unzip . map fromTixMix
   where
     fromTixMix TixMix{..} =
-      let mixEntries = flip map tixMixEntries $
-            \(TixMixEntry start end boxLabel _) -> MixEntry start end boxLabel
-          moduleToMix = (tixMixModule, mkMix tixMixFilePath mixEntries)
+      let toMixEntry (TixMixEntry start end _) = MixEntry start end (ExpBox True)
+          moduleToMix = mkModuleToMix tixMixModule tixMixFilePath $ map toMixEntry tixMixEntries
           tix = mkTix tixMixModule $ map tixMixEntryTicks tixMixEntries
       in (moduleToMix, tix)
 

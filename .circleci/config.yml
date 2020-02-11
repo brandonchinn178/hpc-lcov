@@ -13,6 +13,24 @@ aliases:
   - &cache_key
     v0-{{ checksum "cache-key.txt" }}
 
+  - &step_build_cache_key
+    run:
+      name: Build cache key
+      command: |
+        FILES=(
+          "${STACK_YAML}"
+          package.yaml
+        )
+        echo "${STACK_YAML}" > cache-key.txt
+        cat "${FILES[@]}" >> cache-key.txt
+        curl -sSL https://get.haskellstack.org/ | sed -n 's/^STACK_VERSION="\(.*\)"/\1/p' >> cache-key.txt
+  - &step_install_stack
+    run:
+      name: Install stack
+      command: |
+        curl -sSL https://get.haskellstack.org/ | sh
+        stack --version
+
 executors:
   centos7:
     parameters:
@@ -42,23 +60,10 @@ jobs:
     steps:
       # init
       - checkout
-      - run:
-          name: Build cache key
-          command: |
-            FILES=(
-              "${STACK_YAML}"
-              package.yaml
-            )
-            echo "${STACK_YAML}" > cache-key.txt
-            cat "${FILES[@]}" >> cache-key.txt
-            curl -sSL https://get.haskellstack.org/ | sed -n 's/^STACK_VERSION="\(.*\)"/\1/p' >> cache-key.txt
+      - *step_build_cache_key
 
       # install stack and dependencies
-      - run:
-          name: Install stack
-          command: |
-            curl -sSL https://get.haskellstack.org/ | sh
-            stack --version
+      - *step_install_stack
       - restore_cache:
           key: *cache_key
       - run:
@@ -117,7 +122,7 @@ jobs:
             - store_artifacts:
                 path: .ci/
       - run:
-          name: Test
+          name: Test hpc-codecov
           command: |
             # tasty-discover-3.0.2 does not discover all modules by default, but this
             # flag is deprecated in newer versions
@@ -132,9 +137,30 @@ jobs:
           steps:
             - run:
                 name: Convert coverage output
-                command: stack exec -- hpc-codecov hpc-codecov:hpc-codecov-test -o coverage.json
+                command: stack exec -- hpc-codecov hpc-codecov:hpc-codecov-test
             - codecov/upload:
                 file: coverage.json
+
+  run_minimal_example:
+    executor: centos7
+
+    steps:
+      - checkout
+      - *step_build_cache_key
+      - *step_install_stack
+      - restore_cache:
+          key: *cache_key
+      - run:
+          name: Build dependencies
+          command: stack build hpc-codecov
+          working_directory: /root/src/minimal-example
+      - run:
+          name: Test minimal-example
+          command: |
+            stack test --coverage
+            stack exec -- hpc-codecov minimal-example:minimal-example-test -o actual.json
+            diff -L actual actual.json -L expected coverage.json --unified
+          working_directory: /root/src/minimal-example
 
 workflows:
   version: 2
@@ -156,3 +182,4 @@ workflows:
       - run_build_and_test:
           name: test_ghc_8.0
           stack_yaml: stack-ghc-8.0.yaml
+      - run_minimal_example
