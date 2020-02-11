@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 
 import Control.Monad (forM)
@@ -9,11 +11,12 @@ import Data.List (intercalate)
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as Opt
-import System.FilePath (takeDirectory, (<.>), (</>))
+import Path (Abs, Dir, File, Path, Rel, reldir, (</>))
+import qualified Path
 import System.Process (readProcess)
 import Trace.Hpc.Codecov (generateCodecovFromTix)
 import Trace.Hpc.Mix (Mix(..), readMix)
-import Trace.Hpc.Tix (Tix(..), readTix, tixModuleName)
+import Trace.Hpc.Tix (Tix(..), TixModule, readTix, tixModuleName)
 
 data CLIOptions = CLIOptions
   { cliTargets :: [String]
@@ -49,16 +52,13 @@ main = do
     (packages, []) -> return packages
     (_, missing) -> fail $ "Invalid target(s): " ++ intercalate ", " missing
 
-  tixModules <- fmap concat $ forM packages $ \(packageName, testName) -> do
-    tixFilePath <- getTixFilePath packageName testName
-    Tix tixModules <- readTix tixFilePath >>=
-      maybe (fail $ "Could not find tix file: " ++ show tixFilePath) return
-    return tixModules
+  tixModules <- fmap concat $ forM packages $ \(packageName, testName) ->
+    getTixFilePath packageName testName >>= readTixPath
 
   mixDirectories <- getMixDirectories
 
   moduleToMixList <- forM tixModules $ \tixModule -> do
-    Mix fileLoc _ _ _ mixEntries <- readMix mixDirectories (Right tixModule)
+    Mix fileLoc _ _ _ mixEntries <- readMixPath mixDirectories (Right tixModule)
     return (tixModuleName tixModule, (fileLoc, mixEntries))
 
   let moduleToMix = Map.toList . Map.fromListWith checkDupeMix $ moduleToMixList
@@ -74,34 +74,56 @@ parseTarget target = case break (== ':') target of
   (package, ':':test) -> Just (package, test)
   _ -> Nothing
 
-getTixFilePath :: String -> String -> IO FilePath
-getTixFilePath package test = do
-  hpcRoot <- getStackHpcRoot
-  return $ hpcRoot </> package </> test </> test <.> ".tix"
+{- HPC file discovery -}
 
-getMixDirectories :: IO [FilePath]
+getTixFilePath :: String -> String -> IO (Path Abs File)
+getTixFilePath packageName testName = do
+  hpcRoot <- getStackHpcRoot
+  package <- Path.parseRelDir packageName
+  test <- Path.parseRelDir testName
+  tixFile <- Path.parseRelFile testName >>= Path.setFileExtension ".tix"
+  return $ hpcRoot </> package </> test </> tixFile
+
+getMixDirectories :: IO [Path Abs Dir]
 getMixDirectories = do
   distDir <- getStackDistPath
   map (mkMixDir distDir) <$> getPackageDirectories
   where
-    mkMixDir distDir packageDir = packageDir </> distDir </> "hpc"
+    mkMixDir distDir packageDir = packageDir </> distDir </> [reldir|hpc|]
+
+{- HPC file readers -}
+
+readTixPath :: Path b File -> IO [TixModule]
+readTixPath path = do
+  Tix tixModules <- readTix (Path.toFilePath path) >>=
+    maybe (fail $ "Could not find tix file: " ++ Path.toFilePath path) return
+  return tixModules
+
+readMixPath :: [Path b Dir] -> Either String TixModule -> IO Mix
+readMixPath = readMix . map Path.toFilePath
 
 {- Stack helpers -}
 
-getStackHpcRoot :: IO FilePath
-getStackHpcRoot = readStack ["path", "--local-hpc-root"]
+getStackHpcRoot :: IO (Path Abs Dir)
+getStackHpcRoot = Path.parseAbsDir =<< readStack ["path", "--local-hpc-root"]
 
-getStackDistPath :: IO FilePath
-getStackDistPath = readStack ["path", "--dist-dir"]
+getStackDistPath :: IO (Path Rel Dir)
+getStackDistPath = Path.parseRelDir =<< readStack ["path", "--dist-dir"]
 
-getPackageDirectories :: IO [FilePath]
+getPackageDirectories :: IO [Path Abs Dir]
 getPackageDirectories = do
   stackConfigPath <- readStack ["path", "--config-location"]
   stackConfig <- Yaml.decodeFileEither stackConfigPath >>=
     either (\e -> fail $ "Could not decode file `" ++ stackConfigPath ++ "`: " ++ show e) return
 
+  stackConfigDir <- Path.parent <$> Path.parseAbsFile stackConfigPath
+
   case JSON.parseMaybe JSON.parseJSON $ stackConfig ! "packages" of
-    Just packages -> return $ map (takeDirectory stackConfigPath </>) packages
+    Just packages -> forM packages $ \case
+      -- special case since Path doesn't support `..`. Not spending too much effort on more complex
+      -- cases
+      ".." -> return $ Path.parent stackConfigDir
+      package -> (stackConfigDir </>) <$> Path.parseRelDir package
     Nothing -> fail $ "Invalid packages field: " ++ show stackConfig
 
 readStack :: [String] -> IO String
