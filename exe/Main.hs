@@ -9,12 +9,11 @@ import Data.List (intercalate)
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as Opt
-import System.Directory (doesFileExist)
 import System.FilePath (takeDirectory, (<.>), (</>))
 import System.Process (readProcess)
 import Trace.Hpc.Codecov (generateCodecovFromTix)
-import Trace.Hpc.Mix (Mix, readMix)
-import Trace.Hpc.Tix (Tix(..), TixModule, readTix, tixModuleName)
+import Trace.Hpc.Mix (readMix)
+import Trace.Hpc.Tix (Tix(..), readTix, tixModuleName)
 
 data CLIOptions = CLIOptions
   { cliTargets :: [String]
@@ -50,20 +49,19 @@ main = do
     (packages, []) -> return packages
     (_, missing) -> fail $ "Invalid target(s): " ++ intercalate ", " missing
 
-  (moduleToMixList, tixModulesList) <- fmap unzip $ forM packages $ \(packageName, testName) -> do
+  tixModules <- fmap concat $ forM packages $ \(packageName, testName) -> do
     tixFilePath <- getTixFilePath packageName testName
     Tix tixModules <- readTix tixFilePath >>=
       maybe (fail $ "Could not find tix file: " ++ show tixFilePath) return
+    return tixModules
 
-    mixDirectory <- getMixDirectory packageName
-    moduleToMix <- forM tixModules $ \tixModule -> do
-      mixFile <- findMixFile mixDirectory tixModule
-      return (tixModuleName tixModule, mixFile)
+  mixDirectories <- getMixDirectories
 
-    return (moduleToMix, tixModules)
+  moduleToMixList <- forM tixModules $ \tixModule -> do
+    mixFile <- readMix mixDirectories (Right tixModule)
+    return (tixModuleName tixModule, mixFile)
 
-  let tixModules = concat tixModulesList
-      moduleToMix = Map.toList . Map.fromListWith checkDupeMix . concat $ moduleToMixList
+  let moduleToMix = Map.toList . Map.fromListWith checkDupeMix $ moduleToMixList
       checkDupeMix mix1 mix2 = if mix1 == mix2
         then mix1
         else error $ ".mix files differ: " ++ show (mix1, mix2)
@@ -81,14 +79,12 @@ getTixFilePath package test = do
   hpcRoot <- getStackHpcRoot
   return $ hpcRoot </> package </> test </> test <.> ".tix"
 
-getMixDirectory :: String -> IO FilePath
-getMixDirectory package = do
-  packageDir <- getPackageDirectory package
+getMixDirectories :: IO [FilePath]
+getMixDirectories = do
   distDir <- getStackDistPath
-  return $ packageDir </> distDir </> "hpc"
-
-findMixFile :: FilePath -> TixModule -> IO Mix
-findMixFile mixDirectory tixModule = readMix [mixDirectory] (Right tixModule)
+  map (mkMixDir distDir) <$> getPackageDirectories
+  where
+    mkMixDir distDir packageDir = packageDir </> distDir </> "hpc"
 
 {- Stack helpers -}
 
@@ -98,35 +94,20 @@ getStackHpcRoot = readStack ["path", "--local-hpc-root"]
 getStackDistPath :: IO FilePath
 getStackDistPath = readStack ["path", "--dist-dir"]
 
-getPackageDirectory :: String -> IO FilePath
-getPackageDirectory package = do
+getPackageDirectories :: IO [FilePath]
+getPackageDirectories = do
   stackConfigPath <- readStack ["path", "--config-location"]
   stackConfig <- Yaml.decodeFileEither stackConfigPath >>=
     either (\e -> fail $ "Could not decode file `" ++ stackConfigPath ++ "`: " ++ show e) return
 
-  let isPackage dir = doesFileExist $ dir </> package <.> "cabal"
-
-  stackPackages <- case JSON.parseMaybe JSON.parseJSON $ stackConfig ! "packages" of
+  case JSON.parseMaybe JSON.parseJSON $ stackConfig ! "packages" of
     Just packages -> return $ map (takeDirectory stackConfigPath </>) packages
     Nothing -> fail $ "Invalid packages field: " ++ show stackConfig
-
-  findM isPackage stackPackages >>=
-    maybe (fail $ "Could not find package: " ++ package) return
 
 readStack :: [String] -> IO String
 readStack args = head . lines <$> readProcess "stack" args ""
 
 {- Utilities -}
-
-findM :: Monad m => (a -> m Bool) -> [a] -> m (Maybe a)
-findM f = go
-  where
-    go [] = return Nothing
-    go (x:xs) = do
-      cond <- f x
-      if cond
-        then return $ Just x
-        else go xs
 
 partitionMaybes :: (a -> Maybe b) -> [a] -> ([b], [a])
 partitionMaybes f = go [] []
