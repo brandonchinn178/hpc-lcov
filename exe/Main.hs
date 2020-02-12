@@ -7,20 +7,19 @@ import qualified Data.Aeson as JSON
 import qualified Data.Aeson.Types as JSON
 import qualified Data.ByteString.Lazy as ByteString
 import Data.HashMap.Lazy ((!))
-import Data.List (intercalate)
 import qualified Data.Map as Map
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as Opt
 import Path (Abs, Dir, File, Path, Rel, reldir, (</>))
 import qualified Path
+import Path.IO (listDir, listDirRecur)
 import System.Process (readProcess)
 import Trace.Hpc.Codecov (generateCodecovFromTix)
 import Trace.Hpc.Mix (Mix(..), readMix)
 import Trace.Hpc.Tix (Tix(..), TixModule, readTix, tixModuleName)
 
 data CLIOptions = CLIOptions
-  { cliTargets :: [String]
-  , cliOutput  :: FilePath
+  { cliOutput :: FilePath
   }
 
 getCLIOptions :: IO CLIOptions
@@ -28,12 +27,7 @@ getCLIOptions = Opt.execParser
   $ Opt.info (Opt.helper <*> parseCLIOptions) $ Opt.progDesc description
   where
     parseCLIOptions = CLIOptions
-      <$> parseCLITargets
-      <*> parseCLIOutput
-    parseCLITargets = Opt.many $ Opt.strArgument $ mconcat
-      [ Opt.metavar "TARGET"
-      , Opt.help "The test-suite(s) to get coverage information for, as `package:test-suite`"
-      ]
+      <$> parseCLIOutput
     parseCLIOutput = Opt.strOption $ mconcat
       [ Opt.long "output"
       , Opt.short 'o'
@@ -48,13 +42,7 @@ main :: IO ()
 main = do
   CLIOptions{..} <- getCLIOptions
 
-  packages <- case partitionMaybes parseTarget cliTargets of
-    (packages, []) -> return packages
-    (_, missing) -> fail $ "Invalid target(s): " ++ intercalate ", " missing
-
-  tixModules <- fmap concat $ forM packages $ \(packageName, testName) ->
-    getTixFilePath packageName testName >>= readTixPath
-
+  tixModules <- fmap concat . mapM readTixPath =<< findTixModules
   mixDirectories <- getMixDirectories
 
   moduleToMixList <- forM tixModules $ \tixModule -> do
@@ -69,20 +57,14 @@ main = do
 
   ByteString.writeFile cliOutput $ JSON.encode report
 
-parseTarget :: String -> Maybe (String, String)
-parseTarget target = case break (== ':') target of
-  (package, ':':test) -> Just (package, test)
-  _ -> Nothing
-
 {- HPC file discovery -}
 
-getTixFilePath :: String -> String -> IO (Path Abs File)
-getTixFilePath packageName testName = do
+-- | Find all .tix files in the HPC root.
+findTixModules :: IO [Path Abs File]
+findTixModules = do
   hpcRoot <- getStackHpcRoot
-  package <- Path.parseRelDir packageName
-  test <- Path.parseRelDir testName
-  tixFile <- Path.parseRelFile testName >>= Path.setFileExtension ".tix"
-  return $ hpcRoot </> package </> test </> tixFile
+  (_, files) <- listDirRecur hpcRoot
+  return $ filter (hasExt ".tix") files
 
 getMixDirectories :: IO [Path Abs Dir]
 getMixDirectories = do
@@ -131,11 +113,5 @@ readStack args = head . lines <$> readProcess "stack" args ""
 
 {- Utilities -}
 
-partitionMaybes :: (a -> Maybe b) -> [a] -> ([b], [a])
-partitionMaybes f = go [] []
-  where
-    go justs nothings [] = (reverse justs, reverse nothings)
-    go justs nothings (a:as) =
-      case f a of
-        Just b -> go (b:justs) nothings as
-        Nothing -> go justs (a:nothings) as
+hasExt :: String -> Path b File -> Bool
+hasExt ext = (== ext) . Path.fileExtension

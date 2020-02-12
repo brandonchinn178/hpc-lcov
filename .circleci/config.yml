@@ -137,7 +137,7 @@ jobs:
           steps:
             - run:
                 name: Convert coverage output
-                command: stack exec -- hpc-codecov hpc-codecov:hpc-codecov-test
+                command: stack exec hpc-codecov
             - codecov/upload:
                 file: coverage.json
 
@@ -158,7 +158,7 @@ jobs:
           name: Test minimal-example
           command: |
             stack test --coverage
-            stack exec -- hpc-codecov minimal-example:minimal-example-test -o actual.json
+            stack exec -- hpc-codecov -o actual.json
             diff -L actual actual.json -L expected coverage.json --unified
           working_directory: /root/src/minimal-example
 

@@ -11,7 +11,7 @@ import Data.Text (Text)
 import Test.Tasty (TestTree)
 import Test.Tasty.Golden (goldenVsString)
 import Test.Tasty.HUnit (testCase, (@?=))
-import Trace.Hpc.Mix (BoxLabel(..), CondBox(..), Mix(..))
+import Trace.Hpc.Mix (BoxLabel(..), CondBox(..))
 import Trace.Hpc.Tix (TixModule(..))
 import Trace.Hpc.Util (toHpcPos)
 

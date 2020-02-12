@@ -47,7 +47,8 @@ executable:
     - bytestring >= 0.10.8.1 && < 0.11
     - hpc-codecov
     - optparse-applicative >= 0.13.2.0 && < 0.16
-    - path >= 0.5.13 && < 0.7
+    - path >= 0.6.0 && < 0.7
+    - path-io >= 1.2.2 && < 1.5
     - process >= 1.4.3.0 && < 1.7
     - unordered-containers >= 0.2.8.0 && < 0.3
     - yaml >= 0.8.24 && < 0.12
