@@ -14,14 +14,15 @@ import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as Opt
 import Path (Abs, Dir, File, Path, Rel, reldir, (</>))
 import qualified Path
-import Path.IO (listDir, listDirRecur)
+import Path.IO (listDir, listDirRecur, resolveFile')
 import System.Process (readProcessWithExitCode)
 import Trace.Hpc.Codecov (generateCodecovFromTix)
 import Trace.Hpc.Mix (Mix(..), readMix)
 import Trace.Hpc.Tix (Tix(..), TixModule, readTix, tixModuleName)
 
 data CLIOptions = CLIOptions
-  { cliOutput :: FilePath
+  { cliTixFiles :: [FilePath]
+  , cliOutput   :: FilePath
   }
 
 getCLIOptions :: IO CLIOptions
@@ -29,7 +30,14 @@ getCLIOptions = Opt.execParser
   $ Opt.info (Opt.helper <*> parseCLIOptions) $ Opt.progDesc description
   where
     parseCLIOptions = CLIOptions
-      <$> parseCLIOutput
+      <$> parseCLITixFiles
+      <*> parseCLIOutput
+    parseCLITixFiles = Opt.many $ Opt.strOption $ mconcat
+      [ Opt.long "file"
+      , Opt.short 'f'
+      , Opt.metavar "FILE"
+      , Opt.help "Manually specify .tix file(s) to convert"
+      ]
     parseCLIOutput = Opt.strOption $ mconcat
       [ Opt.long "output"
       , Opt.short 'o'
@@ -45,7 +53,10 @@ main = do
   CLIOptions{..} <- getCLIOptions
   stackRoot <- getStackRoot
 
-  tixModules <- fmap concat . mapM readTixPath =<< findTixModules
+  tixFiles <- if null cliTixFiles
+    then findTixModules
+    else mapM resolveFile' cliTixFiles
+  tixModules <- concat <$> mapM readTixPath tixFiles
 
   distDir <- getStackDistPath
   packages <- getPackages
