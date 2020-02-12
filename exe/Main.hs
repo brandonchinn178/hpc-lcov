@@ -1,13 +1,15 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications #-}
 
 import Control.Monad (forM)
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.Types as JSON
 import qualified Data.ByteString.Lazy as ByteString
-import Data.HashMap.Lazy ((!))
+import Data.HashMap.Lazy (HashMap, (!))
 import qualified Data.Map as Map
+import qualified Data.Text as Text
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as Opt
 import Path (Abs, Dir, File, Path, Rel, reldir, (</>))
@@ -41,13 +43,26 @@ getCLIOptions = Opt.execParser
 main :: IO ()
 main = do
   CLIOptions{..} <- getCLIOptions
+  stackRoot <- getStackRoot
 
   tixModules <- fmap concat . mapM readTixPath =<< findTixModules
-  mixDirectories <- getMixDirectories
+
+  distDir <- getStackDistPath
+  packages <- getPackages
+  let mixDirectories = map (getMixDirectory distDir . snd) packages
 
   moduleToMixList <- forM tixModules $ \tixModule -> do
     Mix fileLoc _ _ _ mixEntries <- readMixPath mixDirectories (Right tixModule)
-    return (tixModuleName tixModule, (fileLoc, mixEntries))
+    fileLocRelPath <- Path.parseRelFile fileLoc
+
+    modulePath <- case getPackageName tixModule `lookup` packages of
+      Just packagePath -> do
+        let modulePathAbs = packagePath </> fileLocRelPath
+        maybe (fail $ show modulePathAbs ++ " is not a subpath of " ++ show stackRoot) return $
+          Path.stripProperPrefix stackRoot modulePathAbs
+      Nothing -> return fileLocRelPath
+
+    return (tixModuleName tixModule, (Path.toFilePath modulePath, mixEntries))
 
   let moduleToMix = Map.toList . Map.fromListWith checkDupeMix $ moduleToMixList
       checkDupeMix mix1 mix2 = if mix1 == mix2
@@ -66,12 +81,8 @@ findTixModules = do
   (_, files) <- listDirRecur hpcRoot
   return $ filter (hasExt ".tix") files
 
-getMixDirectories :: IO [Path Abs Dir]
-getMixDirectories = do
-  distDir <- getStackDistPath
-  map (mkMixDir distDir) <$> getPackageDirectories
-  where
-    mkMixDir distDir packageDir = packageDir </> distDir </> [reldir|hpc|]
+getMixDirectory :: Path Rel Dir -> Path Abs Dir -> Path Abs Dir
+getMixDirectory distDir packageDir = packageDir </> distDir </> [reldir|hpc|]
 
 {- HPC file readers -}
 
@@ -84,7 +95,27 @@ readTixPath path = do
 readMixPath :: [Path b Dir] -> Either String TixModule -> IO Mix
 readMixPath = readMix . map Path.toFilePath
 
+{- Haskell package helpers -}
+
+getPackageName :: TixModule -> String
+getPackageName = Text.unpack . takePackageName . Text.pack . tixModuleName
+  where
+    -- Tix module name is either just the module name or in the format `PACKAGE-VERSION-HASH/MODULE`
+    takePackageName s = case Text.splitOn "/" s of
+      [packageVersionHash, _] ->
+        Text.intercalate "-" . dropEnd 2 . Text.splitOn "-" $ packageVersionHash
+      _ -> s
+
+    dropEnd n xs = take (length xs - n) xs
+
 {- Stack helpers -}
+
+-- | Get the root of the stack project.
+getStackRoot :: IO (Path Abs Dir)
+getStackRoot = do
+  -- assume that the stack.yaml file is at the root of the stack projet
+  configPath <- readStack ["path", "--config-location"]
+  Path.parent <$> Path.parseAbsFile configPath
 
 getStackHpcRoot :: IO (Path Abs Dir)
 getStackHpcRoot = Path.parseAbsDir =<< readStack ["path", "--local-hpc-root"]
@@ -92,21 +123,33 @@ getStackHpcRoot = Path.parseAbsDir =<< readStack ["path", "--local-hpc-root"]
 getStackDistPath :: IO (Path Rel Dir)
 getStackDistPath = Path.parseRelDir =<< readStack ["path", "--dist-dir"]
 
-getPackageDirectories :: IO [Path Abs Dir]
-getPackageDirectories = do
+-- | Get a list of package names in the stack project and their location.
+getPackages :: IO [(String, Path Abs Dir)]
+getPackages = do
   stackConfigPath <- readStack ["path", "--config-location"]
-  stackConfig <- Yaml.decodeFileEither stackConfigPath >>=
+  stackConfig <- Yaml.decodeFileEither @(HashMap String JSON.Value) stackConfigPath >>=
     either (\e -> fail $ "Could not decode file `" ++ stackConfigPath ++ "`: " ++ show e) return
 
   stackConfigDir <- Path.parent <$> Path.parseAbsFile stackConfigPath
 
-  case JSON.parseMaybe JSON.parseJSON $ stackConfig ! "packages" of
-    Just packages -> forM packages $ \case
+  packagePaths <- maybe (fail $ "Invalid packages field: " ++ show stackConfig) return $
+    JSON.parseMaybe JSON.parseJSON (stackConfig ! "packages")
+
+  forM packagePaths $ \packagePath -> do
+    packageDir <- case packagePath of
       -- special case since Path doesn't support `..`. Not spending too much effort on more complex
       -- cases
       ".." -> return $ Path.parent stackConfigDir
       package -> (stackConfigDir </>) <$> Path.parseRelDir package
-    Nothing -> fail $ "Invalid packages field: " ++ show stackConfig
+
+    (_, files) <- listDir packageDir
+
+    packageName <- case filter (hasExt ".cabal") files of
+      [] -> fail $ "No .cabal file found in " ++ Path.toFilePath packageDir
+      [cabal] -> Path.toFilePath . Path.filename <$> Path.setFileExtension "" cabal
+      _ -> fail $ "Multiple .cabal files found in " ++ Path.toFilePath packageDir
+
+    return (packageName, packageDir)
 
 readStack :: [String] -> IO String
 readStack args = head . lines <$> readProcess "stack" args ""
