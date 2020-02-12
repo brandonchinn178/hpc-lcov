@@ -15,7 +15,7 @@ import qualified Options.Applicative as Opt
 import Path (Abs, Dir, File, Path, Rel, reldir, (</>))
 import qualified Path
 import Path.IO (listDir, listDirRecur)
-import System.Process (readProcess)
+import System.Process (readProcessWithExitCode)
 import Trace.Hpc.Codecov (generateCodecovFromTix)
 import Trace.Hpc.Mix (Mix(..), readMix)
 import Trace.Hpc.Tix (Tix(..), TixModule, readTix, tixModuleName)
@@ -152,7 +152,9 @@ getPackages = do
     return (packageName, packageDir)
 
 readStack :: [String] -> IO String
-readStack args = head . lines <$> readProcess "stack" args ""
+readStack args = do
+  (_, stdout, _) <- readProcessWithExitCode "stack" args ""
+  return . head . lines $ stdout
 
 {- Utilities -}
 
