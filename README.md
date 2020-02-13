@@ -1,29 +1,23 @@
-# hpc-codecov
+# hpc-lcov
 
-![CircleCI](https://img.shields.io/circleci/build/github/LeapYear/hpc-codecov)
-![Hackage](https://img.shields.io/hackage/v/hpc-codecov)
+![CircleCI](https://img.shields.io/circleci/build/github/LeapYear/hpc-lcov)
+![Hackage](https://img.shields.io/hackage/v/hpc-lcov)
 
-Convert HPC output into JSON files that can be uploaded to [Codecov](https://codecov.io).
+Convert HPC output into `lcov.info` files that can be uploaded to coverage
+services, like [Codecov](https://codecov.io).
 
 ## Quickstart
 
 ### Stack
 
-1. Run `stack build hpc-codecov`
+1. Run `stack build hpc-lcov`
 1. Run your test(s) with coverage, e.g. `stack test --coverage`
-1. Run `stack exec hpc-codecov`
-1. Upload the JSON file with your desired method, e.g. using the
-   [Codecov Bash uploader](https://docs.codecov.io/docs/about-the-codecov-bash-uploader)
+1. Run `stack exec hpc-lcov`
+1. Upload the generated `lcov.info` file to your coverage service
 
 ### Cabal
 
 TODO
-
-## Comparison to other libraries
-
-I tried using [`codecov-haskell`](http://hackage.haskell.org/package/codecov-haskell),
-but I couldn't get it to build. I also wanted a tool that only did the conversion
-because I was using the really handy Codecov Circle CI orb.
 
 ## FAQs
 
@@ -42,5 +36,5 @@ because I was using the really handy Codecov Circle CI orb.
    # merge with hpc
    $ stack exec -- hpc combine my-exe.tix my-test-suite.tix --union > combined.tix
    ```
-1. Run `stack exec -- hpc-codecov --file TIX_FILE`, with the path of the `.tix`
+1. Run `stack exec -- hpc-lcov --file TIX_FILE`, with the path of the `.tix`
    file
