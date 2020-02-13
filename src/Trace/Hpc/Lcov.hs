@@ -11,7 +11,7 @@ import Data.Maybe (catMaybes, fromMaybe)
 import Data.Ord (comparing)
 import Trace.Hpc.Mix (BoxLabel(..), MixEntry)
 import Trace.Hpc.Tix (TixModule(..), tixModuleName, tixModuleTixs)
-import Trace.Hpc.Util (HpcPos, fromHpcPos)
+import Trace.Hpc.Util (HpcPos, fromHpcPos, toHash)
 
 import Trace.Hpc.Lcov.Report
 
@@ -76,6 +76,7 @@ mergeBranchReports = map mkBranchReport . Map.toList . Map.fromListWith addPairs
   where
     mkBranchReport (hpcPos, (trueHits, falseHits)) = BranchReport
       { branchReportLine = hpcPosLine hpcPos
+      , branchReportHash = toHash hpcPos
       , branchReportTrueHits = trueHits
       , branchReportFalseHits = falseHits
       }

@@ -11,6 +11,9 @@ module Trace.Hpc.Lcov.Report
   ) where
 
 import Data.List (intercalate)
+import Data.Word (Word32)
+import Trace.Hpc.Util (Hash)
+import Unsafe.Coerce (unsafeCoerce)
 
 -- http://ltp.sourceforge.net/coverage/lcov/geninfo.1.php
 newtype LcovReport = LcovReport [FileReport]
@@ -30,6 +33,7 @@ data FunctionReport = FunctionReport
 
 data BranchReport = BranchReport
   { branchReportLine      :: Int
+  , branchReportHash      :: Hash
   , branchReportTrueHits  :: Integer
   , branchReportFalseHits :: Integer
   } deriving (Show, Eq)
@@ -43,18 +47,16 @@ writeReport :: FilePath -> LcovReport -> IO ()
 writeReport fp = writeFile fp . showReport
 
 showReport :: LcovReport -> String
-showReport (LcovReport fileReports) = unlines $ concat $ zipWith generateFileReport branchIds fileReports
+showReport (LcovReport fileReports) = unlines $ concatMap generateFileReport fileReports
   where
-    branchIds = scanl (+) 0 . map (length . fileReportBranches) $ fileReports
-
-    generateFileReport branchId FileReport{..} = concat
+    generateFileReport FileReport{..} = concat
       [ [line "TN" []]
       , [line "SF" [fileReportLocation]]
       , map showFunctionDefinition fileReportFunctions
       , map showFunctionHits fileReportFunctions
       , [line "FNF" [show $ length fileReportFunctions]]
       , [line "FNH" [countHits functionReportHits fileReportFunctions]]
-      , concat $ zipWith generateBranchReport [branchId..] fileReportBranches
+      , concatMap generateBranchReport fileReportBranches
       , [line "BRF" [show $ length fileReportBranches * 2]] -- multiplying by 2 for true and false branches
       , [line "BRH" [countHits branchReportHits fileReportBranches]]
       , map showLineReport fileReportLines
@@ -67,10 +69,15 @@ showReport (LcovReport fileReports) = unlines $ concat $ zipWith generateFileRep
 
     showFunctionHits FunctionReport{..} = line "FNDA" [show functionReportHits, functionReportName]
 
-    generateBranchReport branchId BranchReport{..} =
-      [ line "BRDA" $ map show [branchReportLine, branchId, 0, fromInteger branchReportTrueHits]
-      , line "BRDA" $ map show [branchReportLine, branchId, 1, fromInteger branchReportFalseHits]
-      ]
+    generateBranchReport BranchReport{..} =
+      let branchHash = unsafeCoerce branchReportHash :: Word32
+          mkBranchLine branchNum hits = line "BRDA"
+            [ show branchReportLine
+            , show branchHash
+            , show (branchNum :: Int)
+            , show hits
+            ]
+      in [mkBranchLine 0 branchReportTrueHits, mkBranchLine 1 branchReportFalseHits]
 
     showLineReport LineReport{..} = line "DA" [show lineReportLine, show lineReportHits]
 

@@ -29,6 +29,7 @@ test_report_serialization =
           , fileReportBranches =
               [ BranchReport
                   { branchReportLine = 1
+                  , branchReportHash = 100
                   , branchReportTrueHits = 10
                   , branchReportFalseHits = 5
                   }
@@ -58,6 +59,7 @@ test_report_serialization =
           , fileReportBranches =
               [ BranchReport
                   { branchReportLine = 1
+                  , branchReportHash = 200
                   , branchReportTrueHits = 0
                   , branchReportFalseHits = 0
                   }

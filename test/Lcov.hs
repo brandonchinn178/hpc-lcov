@@ -8,7 +8,7 @@ import Test.Tasty (TestTree)
 import Test.Tasty.HUnit (testCase, (@?=))
 import Trace.Hpc.Mix (BoxLabel(..), CondBox(..))
 import Trace.Hpc.Tix (TixModule(..))
-import Trace.Hpc.Util (toHpcPos)
+import Trace.Hpc.Util (Hash, HpcPos, toHash, toHpcPos)
 
 import Trace.Hpc.Lcov
 import Trace.Hpc.Lcov.Report
@@ -58,7 +58,7 @@ test_generate_lcov_branch = testCase "generateLcovFromTix BranchReport" $
     in fromReport report @?=
       [ FileReport "Test.hs"
           []
-          [ BranchReport 1 0 10
+          [ BranchReport 1 (getHash 1) 0 10
           ]
           []
       ]
@@ -104,7 +104,7 @@ test_generate_lcov_merge_tixs = testCase "generateLcovFromTix merge .tix files" 
         [ FunctionReport 1 "foo" 3
         , FunctionReport 2 "foo$bar" 5
         ]
-        [ BranchReport 3 9 0
+        [ BranchReport 3 (getHash 3) 9 0
         ]
         [ LineReport 3 7
         ]
@@ -118,7 +118,7 @@ mkTix moduleName ticks = TixModule moduleName 0 (length ticks) ticks
 mkModuleToMix :: String -> FilePath -> [(Int, BoxLabel)] -> (String, FileInfo)
 mkModuleToMix moduleName filePath mixEntries = (moduleName, (filePath, mixs))
   where
-    mixs = flip map mixEntries $ \(line, boxLabel) -> (toHpcPos (line, 0, 0, 0), boxLabel)
+    mixs = flip map mixEntries $ \(line, boxLabel) -> (getHpcPos line, boxLabel)
 
 data TixMix = TixMix
   { tixMixModule   :: String
@@ -143,3 +143,9 @@ generateLcovFromTixMix = uncurry generateLcovFromTix . unzip . map fromTixMix
 
 fromReport :: LcovReport -> [FileReport]
 fromReport (LcovReport fileReports) = sortOn fileReportLocation fileReports
+
+getHpcPos :: Int -> HpcPos
+getHpcPos line = toHpcPos (line, 0, 0, 0)
+
+getHash :: Int -> Hash
+getHash = toHash . getHpcPos
