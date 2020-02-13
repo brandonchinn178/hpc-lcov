@@ -31,7 +31,6 @@ when:
       - -Wnoncanonical-monadfail-instances
 
 dependencies:
-- aeson >= 1.1.2.0 && < 1.5
 - base >= 4.9 && < 5
 - containers >= 0.5.7.1 && < 0.7
 - hpc >= 0.6.0.3 && < 0.7
@@ -44,7 +43,7 @@ executable:
   source-dirs: exe
   main: Main.hs
   dependencies:
-    - bytestring >= 0.10.8.1 && < 0.11
+    - aeson >= 1.1.2.0 && < 1.5
     - hpc-lcov
     - optparse-applicative >= 0.13.2.0 && < 0.16
     - path >= 0.6.0 && < 0.7

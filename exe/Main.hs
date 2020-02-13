@@ -6,7 +6,6 @@
 import Control.Monad (forM)
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.Types as JSON
-import qualified Data.ByteString.Lazy as ByteString
 import Data.HashMap.Lazy (HashMap, (!))
 import qualified Data.Map as Map
 import qualified Data.Text as Text
@@ -16,7 +15,7 @@ import Path (Abs, Dir, File, Path, Rel, reldir, (</>))
 import qualified Path
 import Path.IO (listDir, listDirRecur, resolveFile')
 import System.Process (readProcessWithExitCode)
-import Trace.Hpc.Lcov (generateLcovFromTix)
+import Trace.Hpc.Lcov (generateLcovFromTix, writeReport)
 import Trace.Hpc.Mix (Mix(..), readMix)
 import Trace.Hpc.Tix (Tix(..), TixModule, readTix, tixModuleName)
 
@@ -81,7 +80,7 @@ main = do
         else error $ ".mix files differ: " ++ show (mix1, mix2)
       report = generateLcovFromTix moduleToMix tixModules
 
-  ByteString.writeFile cliOutput $ JSON.encode report
+  writeReport cliOutput report
 
 {- HPC file discovery -}
 
