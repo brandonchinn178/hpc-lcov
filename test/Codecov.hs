@@ -68,6 +68,23 @@ test_generate_codecov_resolve_hits = testCase "generateCodecovFromTix resolve hi
     , ("WithPartial.hs", [(1, Partial)])
     ]
 
+test_generate_codecov_merge_tixs :: TestTree
+test_generate_codecov_merge_tixs = testCase "generateCodecovFromTix merge .tix files" $
+  let report = generateCodecovFromTix
+        [ mkModuleToMix "Test" "Test.hs"
+            [ MixEntry (1, 1) (1, 10) (ExpBox True)
+            , MixEntry (2, 1) (2, 10) (ExpBox True)
+            , MixEntry (3, 1) (3, 10) (ExpBox True)
+            , MixEntry (4, 1) (4, 10) (ExpBox True)
+            ]
+        ]
+        [ mkTix "Test" [0, 0, 1, 1]
+        , mkTix "Test" [0, 1, 0, 1]
+        ]
+  in fromReport report @?=
+    [ ("Test.hs", [(1, Hit 0), (2, Hit 1), (3, Hit 1), (4, Hit 2)])
+    ]
+
 test_generate_codecov_non_expbox :: TestTree
 test_generate_codecov_non_expbox = testCase "generateCodecovFromTix non-ExpBox" $
   let report = generateCodecovFromTix
