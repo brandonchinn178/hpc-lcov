@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Codecov where
+module Lcov where
 
 import Control.Arrow ((&&&))
 import Data.Aeson (encode)
@@ -15,8 +15,8 @@ import Trace.Hpc.Mix (BoxLabel(..), CondBox(..))
 import Trace.Hpc.Tix (TixModule(..))
 import Trace.Hpc.Util (toHpcPos)
 
-import Trace.Hpc.Codecov
-import Trace.Hpc.Codecov.Report (CodecovReport(..), FileReport(..), Hit(..))
+import Trace.Hpc.Lcov
+import Trace.Hpc.Lcov.Report (CodecovReport(..), FileReport(..), Hit(..))
 
 test_generate_codecov :: TestTree
 test_generate_codecov =

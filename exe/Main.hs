@@ -16,7 +16,7 @@ import Path (Abs, Dir, File, Path, Rel, reldir, (</>))
 import qualified Path
 import Path.IO (listDir, listDirRecur, resolveFile')
 import System.Process (readProcessWithExitCode)
-import Trace.Hpc.Codecov (generateCodecovFromTix)
+import Trace.Hpc.Lcov (generateCodecovFromTix)
 import Trace.Hpc.Mix (Mix(..), readMix)
 import Trace.Hpc.Tix (Tix(..), TixModule, readTix, tixModuleName)
 

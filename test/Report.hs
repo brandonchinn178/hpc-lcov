@@ -7,7 +7,7 @@ import qualified Data.IntMap as IntMap
 import Test.Tasty (TestTree)
 import Test.Tasty.Golden (goldenVsString)
 
-import Trace.Hpc.Codecov.Report
+import Trace.Hpc.Lcov.Report
 
 test_report_serialization :: TestTree
 test_report_serialization =

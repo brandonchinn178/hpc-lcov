@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Trace.Hpc.Codecov.Report
+module Trace.Hpc.Lcov.Report
   ( CodecovReport(..)
   , FileReport(..)
   , Hit(..)

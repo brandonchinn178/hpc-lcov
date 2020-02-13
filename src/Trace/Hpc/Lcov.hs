@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 
-module Trace.Hpc.Codecov
+module Trace.Hpc.Lcov
   ( generateCodecovFromTix
   , FileInfo
   ) where
@@ -16,7 +16,7 @@ import Trace.Hpc.Mix (BoxLabel(..), MixEntry)
 import Trace.Hpc.Tix (TixModule(..), tixModuleName, tixModuleTixs)
 import Trace.Hpc.Util (HpcPos, fromHpcPos, insideHpcPos)
 
-import Trace.Hpc.Codecov.Report (CodecovReport(..), FileReport(..), Hit(..))
+import Trace.Hpc.Lcov.Report (CodecovReport(..), FileReport(..), Hit(..))
 
 -- | Path to source file (relative to .cabal file) and entries from the .mix file.
 type FileInfo = (FilePath, [MixEntry])
