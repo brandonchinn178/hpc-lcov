@@ -16,7 +16,7 @@ import Path (Abs, Dir, File, Path, Rel, reldir, (</>))
 import qualified Path
 import Path.IO (listDir, listDirRecur, resolveFile')
 import System.Process (readProcessWithExitCode)
-import Trace.Hpc.Lcov (generateCodecovFromTix)
+import Trace.Hpc.Lcov (generateLcovFromTix)
 import Trace.Hpc.Mix (Mix(..), readMix)
 import Trace.Hpc.Tix (Tix(..), TixModule, readTix, tixModuleName)
 
@@ -42,11 +42,11 @@ getCLIOptions = Opt.execParser
       [ Opt.long "output"
       , Opt.short 'o'
       , Opt.metavar "FILE"
-      , Opt.help "The file to save coverage information (default: coverage.json)"
-      , Opt.value "coverage.json"
+      , Opt.help "The file to save coverage information (default: lcov.info)"
+      , Opt.value "lcov.info"
       ]
 
-    description = "Convert HPC coverage output into Codecov JSON coverage format"
+    description = "Convert HPC coverage output into the LCOV format"
 
 main :: IO ()
 main = do
@@ -79,7 +79,7 @@ main = do
       checkDupeMix mix1 mix2 = if mix1 == mix2
         then mix1
         else error $ ".mix files differ: " ++ show (mix1, mix2)
-      report = generateCodecovFromTix moduleToMix tixModules
+      report = generateLcovFromTix moduleToMix tixModules
 
   ByteString.writeFile cliOutput $ JSON.encode report
 

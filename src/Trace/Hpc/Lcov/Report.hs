@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Trace.Hpc.Lcov.Report
-  ( CodecovReport(..)
+  ( LcovReport(..)
   , FileReport(..)
   , Hit(..)
   ) where
@@ -14,12 +14,12 @@ import qualified Data.IntMap as IntMap
 import Data.Text (Text)
 import qualified Data.Text as Text
 
--- https://docs.codecov.io/reference#section-codecov-json-report-format
-newtype CodecovReport = CodecovReport [FileReport]
+-- http://ltp.sourceforge.net/coverage/lcov/geninfo.1.php
+newtype LcovReport = LcovReport [FileReport]
   deriving (Show, Eq)
 
-instance ToJSON CodecovReport where
-  toJSON (CodecovReport fileReports) = object
+instance ToJSON LcovReport where
+  toJSON (LcovReport fileReports) = object
     [ "coverage" .= objectWith fromReport fileReports
     ]
     where

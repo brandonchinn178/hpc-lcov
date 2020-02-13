@@ -16,12 +16,12 @@ import Trace.Hpc.Tix (TixModule(..))
 import Trace.Hpc.Util (toHpcPos)
 
 import Trace.Hpc.Lcov
-import Trace.Hpc.Lcov.Report (CodecovReport(..), FileReport(..), Hit(..))
+import Trace.Hpc.Lcov.Report (LcovReport(..), FileReport(..), Hit(..))
 
-test_generate_codecov :: TestTree
-test_generate_codecov =
-  goldenVsString "generateCodecovFromTix" "test/golden/generate_codecov.golden" $
-    pure $ encode $ generateCodecovFromTixMix
+test_generate_lcov :: TestTree
+test_generate_lcov =
+  goldenVsString "generateLcovFromTix" "test/golden/generate_lcov.golden" $
+    pure $ encode $ generateLcovFromTixMix
       [ TixMix "MyModule.Foo" "src/MyModule/Foo.hs"
           [ TixMixEntry (1, 1) (1, 20) 0
           , TixMixEntry (2, 1) (2, 20) 1
@@ -35,9 +35,9 @@ test_generate_codecov =
           ]
       ]
 
-test_generate_codecov_resolve_hits :: TestTree
-test_generate_codecov_resolve_hits = testCase "generateCodecovFromTix resolve hits" $
-  let report = generateCodecovFromTixMix
+test_generate_lcov_resolve_hits :: TestTree
+test_generate_lcov_resolve_hits = testCase "generateLcovFromTix resolve hits" $
+  let report = generateLcovFromTixMix
         [ TixMix "WithPartial" "WithPartial.hs"
             [ TixMixEntry (1, 1) (1, 5) 10
             , TixMixEntry (1, 10) (1, 20) 0
@@ -68,9 +68,9 @@ test_generate_codecov_resolve_hits = testCase "generateCodecovFromTix resolve hi
     , ("WithPartial.hs", [(1, Partial)])
     ]
 
-test_generate_codecov_merge_tixs :: TestTree
-test_generate_codecov_merge_tixs = testCase "generateCodecovFromTix merge .tix files" $
-  let report = generateCodecovFromTix
+test_generate_lcov_merge_tixs :: TestTree
+test_generate_lcov_merge_tixs = testCase "generateLcovFromTix merge .tix files" $
+  let report = generateLcovFromTix
         [ mkModuleToMix "Test" "Test.hs"
             [ MixEntry (1, 1) (1, 10) (ExpBox True)
             , MixEntry (2, 1) (2, 10) (ExpBox True)
@@ -85,9 +85,9 @@ test_generate_codecov_merge_tixs = testCase "generateCodecovFromTix merge .tix f
     [ ("Test.hs", [(1, Hit 0), (2, Hit 1), (3, Hit 1), (4, Hit 2)])
     ]
 
-test_generate_codecov_non_expbox :: TestTree
-test_generate_codecov_non_expbox = testCase "generateCodecovFromTix non-ExpBox" $
-  let report = generateCodecovFromTix
+test_generate_lcov_non_expbox :: TestTree
+test_generate_lcov_non_expbox = testCase "generateLcovFromTix non-ExpBox" $
+  let report = generateLcovFromTix
         [ mkModuleToMix "WithBinBox" "WithBinBox.hs"
             -- if [x > 0] then ... else ...
             --    ^ evaluates to True 10 times, False 0 times
@@ -154,8 +154,8 @@ data TixMixEntry = TixMixEntry
   , tixMixEntryTicks    :: Integer
   }
 
-generateCodecovFromTixMix :: [TixMix] -> CodecovReport
-generateCodecovFromTixMix = uncurry generateCodecovFromTix . unzip . map fromTixMix
+generateLcovFromTixMix :: [TixMix] -> LcovReport
+generateLcovFromTixMix = uncurry generateLcovFromTix . unzip . map fromTixMix
   where
     fromTixMix TixMix{..} =
       let toMixEntry (TixMixEntry start end _) = MixEntry start end (ExpBox True)
@@ -163,7 +163,7 @@ generateCodecovFromTixMix = uncurry generateCodecovFromTix . unzip . map fromTix
           tix = mkTix tixMixModule $ map tixMixEntryTicks tixMixEntries
       in (moduleToMix, tix)
 
-fromReport :: CodecovReport -> [(Text, [(Int, Hit)])]
-fromReport (CodecovReport fileReports) = sortOn fst $ map (fileName &&& getHits) fileReports
+fromReport :: LcovReport -> [(Text, [(Int, Hit)])]
+fromReport (LcovReport fileReports) = sortOn fst $ map (fileName &&& getHits) fileReports
   where
     getHits = IntMap.toList . lineHits

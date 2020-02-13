@@ -12,7 +12,7 @@ import Trace.Hpc.Lcov.Report
 test_report_serialization :: TestTree
 test_report_serialization =
   goldenVsString "report serialization" "test/golden/report_serialization.golden" $ pure $ encode $
-    CodecovReport
+    LcovReport
       [ FileReport "src/MyModule/Foo.hs" $ IntMap.fromList
           [ (1, Hit 0)
           , (2, Hit 1)
