@@ -1,24 +1,20 @@
-{-# LANGUAGE TupleSections #-}
-
 module Trace.Hpc.Lcov
   ( generateLcovFromTix
+  , writeReport
   , FileInfo
   ) where
 
 import Control.Arrow ((&&&))
-import Data.IntMap (IntMap)
-import qualified Data.IntMap.Strict as IntMap
-import Data.List (foldl', foldl1')
+import Data.List (intercalate)
 import qualified Data.Map.Strict as Map
-import Data.Maybe (fromMaybe, mapMaybe)
-import qualified Data.Text as Text
+import Data.Maybe (catMaybes, fromMaybe)
 import Trace.Hpc.Mix (BoxLabel(..), MixEntry)
 import Trace.Hpc.Tix (TixModule(..), tixModuleName, tixModuleTixs)
-import Trace.Hpc.Util (HpcPos, fromHpcPos, insideHpcPos)
+import Trace.Hpc.Util (HpcPos, fromHpcPos)
 
-import Trace.Hpc.Lcov.Report (LcovReport(..), FileReport(..), Hit(..))
+import Trace.Hpc.Lcov.Report
 
--- | Path to source file (relative to .cabal file) and entries from the .mix file.
+-- | Path to source file and entries from the corresponding .mix file.
 type FileInfo = (FilePath, [MixEntry])
 
 -- | Generate LCOV format from HPC coverage data.
@@ -35,7 +31,13 @@ generateLcovFromTix moduleToMix = LcovReport . map mkFileReport . mergeTixModule
             fromMaybe
               (error $ "Could not find .mix file for: " ++ moduleName)
               $ moduleName `lookup` moduleToMix
-      in FileReport (Text.pack fileLoc) (mkLineHits $ zip mixEntries tickCounts)
+          overTixMix f = catMaybes $ zipWith f tickCounts mixEntries
+      in FileReport
+        { fileReportLocation = fileLoc
+        , fileReportFunctions = overTixMix parseFunctionReport
+        , fileReportBranches = mergeBranchReports $ overTixMix parseBranchReport
+        , fileReportLines = overTixMix parseLineReport
+        }
 
 -- | Merge all tix modules representing the same module.
 --
@@ -47,66 +49,47 @@ mergeTixModules = Map.elems . Map.fromListWith mergeTixs . map (tixModuleName &&
     mergeTixs (TixModule moduleName hash len ticks1) (TixModule _ _ _ ticks2) =
       TixModule moduleName hash len $ zipWith (+) ticks1 ticks2
 
-type TickCount = Integer
-
--- | Return a mapping from line count to Hit.
---
--- If a line is resolved with multiple hits, it can mean one of two things:
---   (1) The hits originate from a Box within another Box, in which case, keep the hit from the more
---      specific box
---   (2) The hits originate from disjoint boxes. This can cause one of the following cases:
---      (a) All hits are zero, in which case, the line has a hit of zero (i.e. a MISS)
---      (b) Some hits are zero, in which case, the line has a PARTIAL hit
---      (c) No hits are zero, in which case, keep the maximum hit
-mkLineHits :: [(MixEntry, TickCount)] -> IntMap Hit
-mkLineHits = fmap resolveHits . concatIntMaps . map (uncurry getLineHits) . filterMixEntries
+parseFunctionReport :: Integer -> MixEntry -> Maybe FunctionReport
+parseFunctionReport tickCount (hpcPos, boxLabel) = mkFunctionReport <$> mFunctionName
   where
-    -- N.B. IntMap list is guaranteed to be non-empty
-    concatIntMaps :: [IntMap v] -> IntMap [v]
-    concatIntMaps = IntMap.unionsWith (++) . map (fmap (:[]))
+    mkFunctionReport names = FunctionReport
+      { functionReportLine = hpcPosLine hpcPos
+      , functionReportName = intercalate "$" names
+      , functionReportHits = tickCount
+      }
 
-    -- `foldl1'` should not be partial here, since `concatIntMaps` returns a non-empty list and
-    -- `filterNonDisjointHits` always returns a non-empty list if it's given a non-empty list
-    resolveHits = foldl1' resolveDisjointHits . filterNonDisjointHits
+    mFunctionName = case boxLabel of
+      TopLevelBox names -> Just names
+      LocalBox names -> Just names
+      _ -> Nothing
 
-    -- combines the hits for each box on a given line
-    resolveDisjointHits (Hit 0) (Hit 0) = Hit 0
-    resolveDisjointHits (Hit x) (Hit y) | x /= 0 && y /= 0 = Hit $ max x y
-    resolveDisjointHits _ _ = Partial
+parseBranchReport :: Integer -> MixEntry -> Maybe (HpcPos, (Integer, Integer))
+parseBranchReport tickCount (hpcPos, boxLabel) = case boxLabel of
+  BinBox _ isTrue ->
+    let branchHits = if isTrue then (tickCount, 0) else (0, tickCount)
+    in Just (hpcPos, branchHits)
+  _ -> Nothing
 
--- | Get hits per line in the given HpcPos.
-getLineHits :: HpcPos -> TickCount -> IntMap (Hit, HpcPos)
-getLineHits hpcPos tickCount = IntMap.fromList $ map (, (hit, hpcPos)) [lineStart..lineEnd]
+mergeBranchReports :: [(HpcPos, (Integer, Integer))] -> [BranchReport]
+mergeBranchReports = map mkBranchReport . Map.toList . Map.fromListWith addPairs
   where
-    hit = Hit $ fromInteger tickCount
-    (lineStart, _, lineEnd, _) = fromHpcPos hpcPos
+    mkBranchReport (hpcPos, (trueHits, falseHits)) = BranchReport
+      { branchReportLine = hpcPosLine hpcPos
+      , branchReportTrueHits = trueHits
+      , branchReportFalseHits = falseHits
+      }
 
--- | Filter out mix entries that should not be included in the coverage report.
-filterMixEntries :: [(MixEntry, TickCount)] -> [(HpcPos, TickCount)]
-filterMixEntries = mapMaybe $ \((hpcPos, boxLabel), tickCount) ->
-  case boxLabel of
-    ExpBox _ -> Just (hpcPos, tickCount)
+    addPairs (a1, b1) (a2, b2) = (a1 + a2, b1 + b2)
 
-    -- BinBox specifies a box that evaluates to a Bool and counts the number of times the box
-    -- evaluates to True/False. We don't care about this information for codecov.
-    BinBox _ _ -> Nothing
+parseLineReport :: Integer -> MixEntry -> Maybe LineReport
+parseLineReport tickCount (hpcPos, boxLabel) = case boxLabel of
+  ExpBox _ -> Just LineReport
+    { lineReportLine = hpcPosLine hpcPos
+    , lineReportHits = tickCount
+    }
+  _ -> Nothing
 
-    -- TopLevelBox/LocalBox specifies boxes counting the number of times a function has been hit.
-    -- Codecov doesn't care about this, just use the number of times each expression in the function
-    -- was hit.
-    TopLevelBox _ -> Nothing
-    LocalBox _ -> Nothing
+{- HpcPos utilities -}
 
--- see point (1) in mkLineHits
---
--- Returns an empty list iff the input is an empty list
-filterNonDisjointHits :: [(Hit, HpcPos)] -> [Hit]
-filterNonDisjointHits = map fst . foldl' makeDisjoint []
-  where
-    makeDisjoint disjointHits hit =
-      if any (hit `contains`) disjointHits
-        then disjointHits
-        else hit : exclude (`contains` hit) disjointHits
-
-    (_, pos1) `contains` (_, pos2) = insideHpcPos pos2 pos1
-    exclude f = filter (not . f)
+hpcPosLine :: HpcPos -> Int
+hpcPosLine = (\(startLine, _, _, _) -> startLine) . fromHpcPos
