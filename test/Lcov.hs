@@ -69,6 +69,9 @@ test_generate_lcov_line = testCase "generateLcovFromTix LineReport" $
           [ TixMix "Test" "Test.hs"
               [ TixMixEntry 1 (ExpBox True) 0
               , TixMixEntry 2 (ExpBox False) 10
+              , TixMixEntry 2 (ExpBox True) 4
+              , TixMixEntry 3 (ExpBox False) 0
+              , TixMixEntry 3 (ExpBox True) 2
               ]
           ]
     in fromReport report @?=
@@ -76,7 +79,9 @@ test_generate_lcov_line = testCase "generateLcovFromTix LineReport" $
           []
           []
           [ LineReport 1 0
+          -- these take the highest hit count for the line
           , LineReport 2 10
+          , LineReport 3 2
           ]
       ]
 

@@ -5,9 +5,10 @@ module Trace.Hpc.Lcov
   ) where
 
 import Control.Arrow ((&&&))
-import Data.List (intercalate)
+import Data.List (intercalate, maximumBy)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (catMaybes, fromMaybe)
+import Data.Ord (comparing)
 import Trace.Hpc.Mix (BoxLabel(..), MixEntry)
 import Trace.Hpc.Tix (TixModule(..), tixModuleName, tixModuleTixs)
 import Trace.Hpc.Util (HpcPos, fromHpcPos)
@@ -36,7 +37,7 @@ generateLcovFromTix moduleToMix = LcovReport . map mkFileReport . mergeTixModule
         { fileReportLocation = fileLoc
         , fileReportFunctions = overTixMix parseFunctionReport
         , fileReportBranches = mergeBranchReports $ overTixMix parseBranchReport
-        , fileReportLines = overTixMix parseLineReport
+        , fileReportLines = mergeLineReports $ overTixMix parseLineReport
         }
 
 -- | Merge all tix modules representing the same module.
@@ -89,7 +90,13 @@ parseLineReport tickCount (hpcPos, boxLabel) = case boxLabel of
     }
   _ -> Nothing
 
-{- HpcPos utilities -}
+mergeLineReports :: [LineReport] -> [LineReport]
+mergeLineReports = Map.elems . Map.fromListWith (maxBy lineReportHits) . map (lineReportLine &&& id)
+
+{- Utilities -}
 
 hpcPosLine :: HpcPos -> Int
 hpcPosLine = (\(startLine, _, _, _) -> startLine) . fromHpcPos
+
+maxBy :: Ord b => (a -> b) -> a -> a -> a
+maxBy f a b = maximumBy (comparing f) [a, b]
