@@ -7,11 +7,12 @@ import Control.Monad (forM)
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.Types as JSON
 import Data.HashMap.Lazy (HashMap, (!))
+import Data.List (find)
 import qualified Data.Map as Map
 import qualified Data.Text as Text
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as Opt
-import Path (Abs, Dir, File, Path, Rel, reldir, (</>))
+import Path (Abs, Dir, File, Path, Rel, reldir, relfile, (</>))
 import qualified Path
 import Path.IO (listDir, listDirRecur, resolveFile')
 import System.Process (readProcessWithExitCode)
@@ -88,8 +89,15 @@ main = do
 findTixModules :: IO [Path Abs File]
 findTixModules = do
   hpcRoot <- getStackHpcRoot
+
   (_, files) <- listDirRecur hpcRoot
-  return $ filter (hasExt ".tix") files
+
+  let tixFiles = filter (hasExt ".tix") files
+      -- Find all.tix, if one exists, which Stack automatically generates
+      -- if multiple .tix files are generated.
+      mAllTix = find ((== [relfile|all.tix|]) . Path.filename) tixFiles
+
+  return $ maybe tixFiles (:[]) mAllTix
 
 getMixDirectory :: Path Rel Dir -> Path Abs Dir -> Path Abs Dir
 getMixDirectory distDir packageDir = packageDir </> distDir </> [reldir|hpc|]
