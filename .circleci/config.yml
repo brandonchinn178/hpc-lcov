@@ -123,7 +123,7 @@ jobs:
             - store_artifacts:
                 path: .ci/
       - run:
-          name: Test hpc-codecov
+          name: Test
           command: |
             # tasty-discover-3.0.2 does not discover all modules by default, but this
             # flag is deprecated in newer versions
@@ -138,9 +138,9 @@ jobs:
           steps:
             - run:
                 name: Convert coverage output
-                command: stack exec hpc-codecov
+                command: stack exec hpc-lcov
             - codecov/upload:
-                file: coverage.json
+                file: lcov.info
 
   run_minimal_example:
     executor: centos7
@@ -153,14 +153,14 @@ jobs:
           key: *cache_key
       - run:
           name: Build dependencies
-          command: stack build hpc-codecov
+          command: stack build hpc-lcov
           working_directory: /root/src/minimal-example
       - run:
           name: Test minimal-example
           command: |
             stack test --coverage
-            stack exec -- hpc-codecov -o actual.json
-            diff -L actual actual.json -L expected coverage.json --unified
+            stack exec -- hpc-lcov -o actual-lcov.info
+            diff -L actual actual-lcov.info -L expected lcov.info --unified
           working_directory: /root/src/minimal-example
 
 workflows:
