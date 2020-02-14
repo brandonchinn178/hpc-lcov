@@ -9,6 +9,7 @@ import qualified Data.Aeson.Types as JSON
 import Data.HashMap.Lazy (HashMap, (!))
 import Data.List (find)
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as Opt
@@ -21,8 +22,9 @@ import Trace.Hpc.Mix (Mix(..), readMix)
 import Trace.Hpc.Tix (Tix(..), TixModule, readTix, tixModuleName)
 
 data CLIOptions = CLIOptions
-  { cliTixFiles :: [FilePath]
-  , cliOutput   :: FilePath
+  { cliTixFiles    :: [FilePath]
+  , cliMainPackage :: Maybe String
+  , cliOutput      :: FilePath
   }
 
 getCLIOptions :: IO CLIOptions
@@ -31,12 +33,18 @@ getCLIOptions = Opt.execParser
   where
     parseCLIOptions = CLIOptions
       <$> parseCLITixFiles
+      <*> parseCLIMainPackage
       <*> parseCLIOutput
     parseCLITixFiles = Opt.many $ Opt.strOption $ mconcat
       [ Opt.long "file"
       , Opt.short 'f'
       , Opt.metavar "FILE"
       , Opt.help "Manually specify .tix file(s) to convert"
+      ]
+    parseCLIMainPackage = Opt.optional $ Opt.strOption $ mconcat
+      [ Opt.long "main-package"
+      , Opt.metavar "PACKAGE"
+      , Opt.help "The package that built the coverage-enabled executable"
       ]
     parseCLIOutput = Opt.strOption $ mconcat
       [ Opt.long "output"
@@ -66,12 +74,18 @@ main = do
     Mix fileLoc _ _ _ mixEntries <- readMixPath mixDirectories (Right tixModule)
     fileLocRelPath <- Path.parseRelFile fileLoc
 
-    modulePath <- case getPackageName tixModule `lookup` packages of
+    let modulePackageName = case tixModuleName tixModule of
+          "Main" -> fromMaybe
+            (error "Found executable in coverage file, --main-package was not provided")
+            cliMainPackage
+          _ -> getPackageName tixModule
+
+    modulePath <- case modulePackageName `lookup` packages of
       Just packagePath -> do
         let modulePathAbs = packagePath </> fileLocRelPath
         maybe (fail $ show modulePathAbs ++ " is not a subpath of " ++ show stackRoot) return $
           Path.stripProperPrefix stackRoot modulePathAbs
-      Nothing -> return fileLocRelPath
+      Nothing -> fail $ "Could not find package: " ++ modulePackageName
 
     return (tixModuleName tixModule, (Path.toFilePath modulePath, mixEntries))
 
