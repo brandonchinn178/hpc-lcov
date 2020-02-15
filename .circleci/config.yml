@@ -125,14 +125,19 @@ jobs:
       - run:
           name: Test
           command: |
+            STACK_ARGS=()
+
             # tasty-discover-3.0.2 does not discover all modules by default, but this
             # flag is deprecated in newer versions
-            TEST_ARGS=()
             if [[ "${STACK_YAML}" == "stack-ghc-8.0.yaml" ]]; then
-              TEST_ARGS+=(--ghc-options '-optF --no-module-suffix')
+              STACK_ARGS+=(--ghc-options '-optF --no-module-suffix')
             fi
 
-            stack test --coverage ${TEST_ARGS+"${TEST_ARGS[@]}"}
+            if [[ -n "${CI_LATEST}" ]]; then
+                STACK_ARGS+=(--coverage)
+            fi
+
+            stack test ${STACK_ARGS+"${STACK_ARGS[@]}"}
       - when:
           condition: << parameters.latest >>
           steps:
