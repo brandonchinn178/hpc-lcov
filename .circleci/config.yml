@@ -159,7 +159,7 @@ jobs:
           command: |
             stack test --coverage
             hpc-lcov -o actual-lcov.info
-            diff -L actual actual-lcov.info -L expected lcov.info --unified
+            diff -L expected lcov.info -L actual actual-lcov.info --unified
           working_directory: /root/src/minimal-example
 
 workflows:
