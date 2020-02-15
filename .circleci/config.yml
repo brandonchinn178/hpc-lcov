@@ -87,7 +87,7 @@ jobs:
             - ~/.stack
             - .stack-work
 
-      # lint, build, and test
+      # lint, build, and test hpc-lcov
       - when:
           condition: << parameters.latest >>
           steps:
@@ -150,24 +150,15 @@ jobs:
             - codecov/upload:
                 file: lcov.info
 
-  run_minimal_example:
-    executor: centos7
-
-    steps:
-      - checkout
-      - *step_build_cache_key
-      - *step_install_stack
-      - restore_cache:
-          key: *cache_key
+      # test minimal-example
       - run:
-          name: Build dependencies
-          command: stack build hpc-lcov
-          working_directory: /root/src/minimal-example
+          name: Prep minimal-example test
+          command: cp "${STACK_YAML}" minimal-example/
       - run:
           name: Test minimal-example
           command: |
             stack test --coverage
-            stack exec -- hpc-lcov -o actual-lcov.info
+            hpc-lcov -o actual-lcov.info
             diff -L actual actual-lcov.info -L expected lcov.info --unified
           working_directory: /root/src/minimal-example
 
@@ -194,4 +185,3 @@ workflows:
       - run_build_and_test:
           name: test_ghc_8.0
           stack_yaml: stack-ghc-8.0.yaml
-      - run_minimal_example
