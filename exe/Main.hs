@@ -7,7 +7,7 @@ import Control.Monad (forM)
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.Types as JSON
 import Data.HashMap.Lazy (HashMap, (!))
-import Data.List (find)
+import Data.List (find, isPrefixOf)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
@@ -64,7 +64,7 @@ main = do
   tixFiles <- if null cliTixFiles
     then findTixModules
     else mapM resolveFile' cliTixFiles
-  tixModules <- concat <$> mapM readTixPath tixFiles
+  tixModules <- filter (not . isPathsModule) . concat <$> mapM readTixPath tixFiles
 
   distDir <- getStackDistPath
   packages <- getPackages
@@ -127,7 +127,7 @@ readTixPath path = do
 readMixPath :: [Path b Dir] -> Either String TixModule -> IO Mix
 readMixPath = readMix . map Path.toFilePath
 
-{- Haskell package helpers -}
+{- Haskell package/module helpers -}
 
 getPackageName :: TixModule -> String
 getPackageName = Text.unpack . takePackageName . Text.pack . tixModuleName
@@ -139,6 +139,9 @@ getPackageName = Text.unpack . takePackageName . Text.pack . tixModuleName
       _ -> s
 
     dropEnd n xs = take (length xs - n) xs
+
+isPathsModule :: TixModule -> Bool
+isPathsModule = ("Paths_" `isPrefixOf`) . tixModuleName
 
 {- Stack helpers -}
 
