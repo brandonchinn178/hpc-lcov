@@ -1,4 +1,4 @@
-name: hpc-codecov
+name: hpc-lcov
 version: 0.1.0
 verbatim:
   cabal-version: '>= 1.10'
@@ -9,14 +9,14 @@ author:
 maintainer:
   - Brandon Chinn <brandon@leapyear.io>
 category: Control
-synopsis: Convert HPC output into Codecov JSON format
+synopsis: Convert HPC output into LCOV format
 description: |
-  Convert HPC output into Codecov JSON format.
+  Convert HPC output into LCOV format.
 extra-source-files:
   - README.md
   - CHANGELOG.md
 
-github: LeapYear/hpc-codecov
+github: LeapYear/hpc-lcov
 
 ghc-options: -Wall
 when:
@@ -31,11 +31,9 @@ when:
       - -Wnoncanonical-monadfail-instances
 
 dependencies:
-- aeson >= 1.1.2.0 && < 1.5
 - base >= 4.9 && < 5
 - containers >= 0.5.7.1 && < 0.7
 - hpc >= 0.6.0.3 && < 0.7
-- text >= 1.2.2.2 && < 1.4
 
 library:
   source-dirs: src
@@ -44,21 +42,22 @@ executable:
   source-dirs: exe
   main: Main.hs
   dependencies:
-    - bytestring >= 0.10.8.1 && < 0.11
-    - hpc-codecov
+    - aeson >= 1.1.2.0 && < 1.5
+    - hpc-lcov
     - optparse-applicative >= 0.13.2.0 && < 0.16
     - path >= 0.6.0 && < 0.7
     - path-io >= 1.2.2 && < 1.5
     - process >= 1.4.3.0 && < 1.7
+    - text >= 1.2.2.2 && < 1.4
     - unordered-containers >= 0.2.8.0 && < 0.3
     - yaml >= 0.8.24 && < 0.12
 
 tests:
-  hpc-codecov-test:
+  hpc-lcov-test:
     source-dirs:  test
     main:         Main.hs
     dependencies:
-      - hpc-codecov
+      - hpc-lcov
       - tasty
       - tasty-discover
       - tasty-golden
