@@ -7,11 +7,13 @@ import Control.Monad (forM)
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.Types as JSON
 import Data.HashMap.Lazy (HashMap, (!))
+import Data.List (find, isPrefixOf)
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as Opt
-import Path (Abs, Dir, File, Path, Rel, reldir, (</>))
+import Path (Abs, Dir, File, Path, Rel, reldir, relfile, (</>))
 import qualified Path
 import Path.IO (listDir, listDirRecur, resolveFile')
 import System.Process (readProcessWithExitCode)
@@ -20,8 +22,9 @@ import Trace.Hpc.Mix (Mix(..), readMix)
 import Trace.Hpc.Tix (Tix(..), TixModule, readTix, tixModuleName)
 
 data CLIOptions = CLIOptions
-  { cliTixFiles :: [FilePath]
-  , cliOutput   :: FilePath
+  { cliTixFiles    :: [FilePath]
+  , cliMainPackage :: Maybe String
+  , cliOutput      :: FilePath
   }
 
 getCLIOptions :: IO CLIOptions
@@ -30,12 +33,18 @@ getCLIOptions = Opt.execParser
   where
     parseCLIOptions = CLIOptions
       <$> parseCLITixFiles
+      <*> parseCLIMainPackage
       <*> parseCLIOutput
     parseCLITixFiles = Opt.many $ Opt.strOption $ mconcat
       [ Opt.long "file"
       , Opt.short 'f'
       , Opt.metavar "FILE"
       , Opt.help "Manually specify .tix file(s) to convert"
+      ]
+    parseCLIMainPackage = Opt.optional $ Opt.strOption $ mconcat
+      [ Opt.long "main-package"
+      , Opt.metavar "PACKAGE"
+      , Opt.help "The package that built the coverage-enabled executable"
       ]
     parseCLIOutput = Opt.strOption $ mconcat
       [ Opt.long "output"
@@ -55,7 +64,7 @@ main = do
   tixFiles <- if null cliTixFiles
     then findTixModules
     else mapM resolveFile' cliTixFiles
-  tixModules <- concat <$> mapM readTixPath tixFiles
+  tixModules <- filter (not . isPathsModule) . concat <$> mapM readTixPath tixFiles
 
   distDir <- getStackDistPath
   packages <- getPackages
@@ -65,12 +74,18 @@ main = do
     Mix fileLoc _ _ _ mixEntries <- readMixPath mixDirectories (Right tixModule)
     fileLocRelPath <- Path.parseRelFile fileLoc
 
-    modulePath <- case getPackageName tixModule `lookup` packages of
+    let modulePackageName = case tixModuleName tixModule of
+          "Main" -> fromMaybe
+            (error "Found executable in coverage file, --main-package was not provided")
+            cliMainPackage
+          _ -> getPackageName tixModule
+
+    modulePath <- case modulePackageName `lookup` packages of
       Just packagePath -> do
         let modulePathAbs = packagePath </> fileLocRelPath
         maybe (fail $ show modulePathAbs ++ " is not a subpath of " ++ show stackRoot) return $
           Path.stripProperPrefix stackRoot modulePathAbs
-      Nothing -> return fileLocRelPath
+      Nothing -> fail $ "Could not find package: " ++ modulePackageName
 
     return (tixModuleName tixModule, (Path.toFilePath modulePath, mixEntries))
 
@@ -88,8 +103,15 @@ main = do
 findTixModules :: IO [Path Abs File]
 findTixModules = do
   hpcRoot <- getStackHpcRoot
+
   (_, files) <- listDirRecur hpcRoot
-  return $ filter (hasExt ".tix") files
+
+  let tixFiles = filter (hasExt ".tix") files
+      -- Find all.tix, if one exists, which Stack automatically generates
+      -- if multiple .tix files are generated.
+      mAllTix = find ((== [relfile|all.tix|]) . Path.filename) tixFiles
+
+  return $ maybe tixFiles (:[]) mAllTix
 
 getMixDirectory :: Path Rel Dir -> Path Abs Dir -> Path Abs Dir
 getMixDirectory distDir packageDir = packageDir </> distDir </> [reldir|hpc|]
@@ -105,7 +127,7 @@ readTixPath path = do
 readMixPath :: [Path b Dir] -> Either String TixModule -> IO Mix
 readMixPath = readMix . map Path.toFilePath
 
-{- Haskell package helpers -}
+{- Haskell package/module helpers -}
 
 getPackageName :: TixModule -> String
 getPackageName = Text.unpack . takePackageName . Text.pack . tixModuleName
@@ -117,6 +139,9 @@ getPackageName = Text.unpack . takePackageName . Text.pack . tixModuleName
       _ -> s
 
     dropEnd n xs = take (length xs - n) xs
+
+isPathsModule :: TixModule -> Bool
+isPathsModule = ("Paths_" `isPrefixOf`) . tixModuleName
 
 {- Stack helpers -}
 

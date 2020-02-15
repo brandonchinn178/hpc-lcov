@@ -26,7 +26,10 @@ TODO
 1. Build the executable with coverage enabled (e.g. `stack build --coverage`)
 1. Run the executable
 1. This should generate a `.tix` file in the current directory
-1. Run `stack exec -- hpc-lcov --file my-exe.tix -o my-exe-lcov.info`
+1. Run the following, specifying the package that builds the executable:
+    ```bash
+    stack exec -- hpc-lcov --file my-exe.tix --main-package my-package
+    ```
 1. (Optional) If you have both test and executable coverage, you'll need to
    install LCOV (e.g. `brew install lcov`) and then run
 
