@@ -100,15 +100,34 @@ jobs:
                   scripts/stylish-haskell.sh || STATUS=1
                   exit "${STATUS}"
       - run:
-          name: Build
+          name: Build and install without coverage
           command: |
             STACK_ARGS=(
                 --test
                 --no-run-tests
                 --ghc-options -Werror
+                --copy-bins
             )
+
+            stack build "${STACK_ARGS[@]}"
+
+            echo "export PATH='${HOME}/.local/bin:${PATH}'" >> "${BASH_ENV}"
+      - run:
+          name: Build and test hpc-lcov (with coverage if latest)
+          command: |
+            STACK_ARGS=(
+                --test
+                --ghc-options -Werror
+            )
+
             if [[ -n "${CI_LATEST}" ]]; then
-                STACK_ARGS+=(--haddock)
+                STACK_ARGS+=(--haddock --coverage)
+            fi
+
+            # tasty-discover-3.0.2 does not discover all modules by default, but this
+            # flag is deprecated in newer versions
+            if [[ "${STACK_YAML}" == "stack-ghc-8.0.yaml" ]]; then
+              STACK_ARGS+=(--ghc-options '-optF --no-module-suffix')
             fi
 
             stack build "${STACK_ARGS[@]}"
@@ -122,28 +141,12 @@ jobs:
           steps:
             - store_artifacts:
                 path: .ci/
-      - run:
-          name: Test
-          command: |
-            STACK_ARGS=()
-
-            # tasty-discover-3.0.2 does not discover all modules by default, but this
-            # flag is deprecated in newer versions
-            if [[ "${STACK_YAML}" == "stack-ghc-8.0.yaml" ]]; then
-              STACK_ARGS+=(--ghc-options '-optF --no-module-suffix')
-            fi
-
-            if [[ -n "${CI_LATEST}" ]]; then
-                STACK_ARGS+=(--coverage)
-            fi
-
-            stack test ${STACK_ARGS+"${STACK_ARGS[@]}"}
       - when:
           condition: << parameters.latest >>
           steps:
             - run:
                 name: Convert coverage output
-                command: stack exec hpc-lcov
+                command: hpc-lcov
             - codecov/upload:
                 file: lcov.info
 
