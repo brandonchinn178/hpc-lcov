@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -181,7 +182,7 @@ getPackages = do
 
     packageName <- case filter (hasExt ".cabal") files of
       [] -> fail $ "No .cabal file found in " ++ Path.toFilePath packageDir
-      [cabal] -> Path.toFilePath . Path.filename <$> Path.setFileExtension "" cabal
+      [cabal] -> Path.toFilePath . Path.filename <$> removeExtension cabal
       _ -> fail $ "Multiple .cabal files found in " ++ Path.toFilePath packageDir
 
     return (packageName, packageDir)
@@ -194,4 +195,17 @@ readStack args = do
 {- Utilities -}
 
 hasExt :: String -> Path b File -> Bool
-hasExt ext = (== ext) . Path.fileExtension
+hasExt ext = (== ext') . Path.fileExtension
+  where
+#if MIN_VERSION_path(0,7,0)
+    ext' = Just ext
+#else
+    ext' = ext
+#endif
+
+removeExtension :: Path b File -> IO (Path b File)
+#if MIN_VERSION_path(0,7,0)
+removeExtension = fmap fst . Path.splitExtension
+#else
+removeExtension = Path.setFileExtension ""
+#endif
