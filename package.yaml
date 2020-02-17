@@ -45,8 +45,8 @@ executable:
     - aeson >= 1.1.2.0 && < 1.5
     - hpc-lcov
     - optparse-applicative >= 0.13.2.0 && < 0.16
-    - path >= 0.6.0 && < 0.7
-    - path-io >= 1.2.2 && < 1.5
+    - path >= 0.6.0 && < 0.8
+    - path-io >= 1.2.2 && < 1.7
     - process >= 1.4.3.0 && < 1.7
     - text >= 1.2.2.2 && < 1.4
     - unordered-containers >= 0.2.8.0 && < 0.3
