@@ -69,59 +69,21 @@ jobs:
           key: *cache_key
       - run:
           name: Build external dependencies
-          command: |
-            STACK_ARGS=(--test --only-dependencies)
-            if [[ -n "${CI_LATEST}" ]]; then
-                STACK_ARGS+=(--haddock)
-            fi
-
-            stack build "${STACK_ARGS[@]}"
-
-            # build hlint/stylish-haskell for cache
-            if [[ -n "${CI_LATEST}" ]]; then
-                stack build hlint stylish-haskell
-            fi
+          command: stack build --test --only-dependencies
       - save_cache:
           key: *cache_key
           paths:
             - ~/.stack
             - .stack-work
 
-      # lint, build, and test hpc-lcov
-      - when:
-          condition: << parameters.latest >>
-          steps:
-            - run:
-                name: Lint
-                command: |
-                  set +e
-                  STATUS=0
-                  scripts/hlint.sh || STATUS=1
-                  scripts/stylish-haskell.sh || STATUS=1
-                  exit "${STATUS}"
+      # Run full build and test
       - run:
-          name: Build and install without coverage
+          name: Build and test hpc-lcov
           command: |
-            STACK_ARGS=(
-                --test
-                --no-run-tests
-                --ghc-options -Werror
-                --copy-bins
-            )
-
-            stack build "${STACK_ARGS[@]}"
-
-            echo "export PATH='${HOME}/.local/bin:${PATH}'" >> "${BASH_ENV}"
-      - run:
-          name: Build and test hpc-lcov (with coverage if latest)
-          command: |
-            STACK_ARGS=(
-                --test
-                --ghc-options -Werror
-            )
+            STACK_ARGS=(--ghc-options -Werror)
 
             if [[ -n "${CI_LATEST}" ]]; then
-                STACK_ARGS+=(--haddock --coverage)
+                STACK_ARGS+=(--coverage)
             fi
 
             # tasty-discover-3.0.2 does not discover all modules by default, but this
@@ -130,17 +92,21 @@ jobs:
               STACK_ARGS+=(--ghc-options '-optF --no-module-suffix')
             fi
 
-            stack build "${STACK_ARGS[@]}"
+            stack test "${STACK_ARGS[@]}"
 
-            if [[ -n "${CI_LATEST}" ]]; then
-              mkdir -p .ci/
-              tar czf .ci/haddock-docs.tar.gz -C "$(find .stack-work/dist -regex '.*/doc/html/[^/]*')" .
-            fi
-      - when:
-          condition: << parameters.latest >>
-          steps:
-            - store_artifacts:
-                path: .ci/
+      # build and install without coverage
+      # so that we can dog-food the project and use it to collect coverage
+      # reports for this project. Should not be built with coverage because
+      # we don't want to generate a hpc-lcov.tix file
+      - run:
+          name: Build and install without coverage
+          command: |
+            # avoid rewriting .mix files and such
+            cp -r .stack-work .stack-work-with-coverage
+            stack install --ghc-options -Werror --local-bin-path /usr/local/bin
+            rm -rf .stack-work
+            mv .stack-work-with-coverage .stack-work
+
       - when:
           condition: << parameters.latest >>
           steps:
@@ -161,6 +127,66 @@ jobs:
             hpc-lcov -o actual-lcov.info
             diff -L expected lcov.info -L actual actual-lcov.info --unified
           working_directory: /root/src/minimal-example
+
+  run_lint:
+    executor: centos7
+
+    steps:
+      # init
+      - checkout
+      - *step_build_cache_key
+
+      # install stack and dependencies
+      - *step_install_stack
+      - restore_cache:
+          key: *cache_key
+      - run:
+          name: Build external dependencies
+          command: stack build hlint stylish-haskell
+
+      # lint
+      - run:
+          name: Lint
+          command: |
+            set +e
+            STATUS=0
+            scripts/hlint.sh || STATUS=1
+            scripts/stylish-haskell.sh || STATUS=1
+            exit "${STATUS}"
+
+  run_haddock:
+    executor: centos7
+
+    steps:
+      # init
+      - checkout
+      - *step_build_cache_key
+      - run: echo haddock >> cache-key.txt
+
+      # install stack and dependencies
+      - *step_install_stack
+      - restore_cache:
+          key: *cache_key
+      - run:
+          name: Build external dependencies
+          command: stack build --test --only-dependencies --haddock
+      - save_cache:
+          key: *cache_key
+          paths:
+            - ~/.stack
+            - .stack-work
+
+      # haddock
+      - run:
+          name: Build haddock
+          command: stack build --ghc-options -Werror --haddock
+      - run:
+          name: Collect haddock
+          command: |
+            mkdir -p .ci/
+            tar czf .ci/haddock-docs.tar.gz -C "$(find .stack-work/dist -regex '.*/doc/html/[^/]*')" .
+      - store_artifacts:
+          path: .ci/
 
 workflows:
   version: 2
@@ -185,3 +211,5 @@ workflows:
       - run_build_and_test:
           name: test_ghc_8.0
           stack_yaml: stack-ghc-8.0.yaml
+      - run_lint
+      - run_haddock
