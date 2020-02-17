@@ -44,6 +44,7 @@ executors:
       STACK_YAML: << parameters.stack_yaml >>
       CI_LATEST: <<# parameters.latest >>1<</ parameters.latest >>
       LANG: en_US.UTF-8
+      COVERAGE_DIR: /root/coverage/
 
 orbs:
   codecov: codecov/codecov@1.0.2
@@ -80,7 +81,11 @@ jobs:
       - run:
           name: Build and test hpc-lcov
           command: |
-            STACK_ARGS=(--ghc-options -Werror)
+            STACK_ARGS=(
+              --ghc-options -Werror
+              --copy-bins
+              --local-bin-path /usr/local/bin
+            )
 
             if [[ -n "${CI_LATEST}" ]]; then
                 STACK_ARGS+=(--coverage)
@@ -93,6 +98,7 @@ jobs:
             fi
 
             stack test "${STACK_ARGS[@]}"
+            mv /usr/local/bin/hpc-lcov /usr/local/bin/hpc-lcov-coverage-enabled
 
       # build and install without coverage
       # so that we can dog-food the project and use it to collect coverage
@@ -112,9 +118,9 @@ jobs:
           steps:
             - run:
                 name: Convert coverage output
-                command: hpc-lcov
+                command: hpc-lcov -o lcov-test.info
             - codecov/upload:
-                file: lcov.info
+                file: lcov-test.info
 
       # test minimal-example
       - run:
@@ -127,6 +133,31 @@ jobs:
             hpc-lcov -o actual-lcov.info
             diff -L expected lcov.info -L actual actual-lcov.info --unified
           working_directory: /root/src/minimal-example
+
+      # Test hpc-lcov executable
+      - run:
+          name: Test hpc-lcov executable on minimal-example
+          command: ../.circleci/test-hpc-lcov.sh /usr/local/bin/hpc-lcov-coverage-enabled "${COVERAGE_DIR}"
+          working_directory: /root/src/minimal-example
+      - when:
+          condition: << parameters.latest >>
+          steps:
+            - run:
+                name: Convert coverage output
+                command: |
+                  yum install -y epel-release
+                  yum install -y lcov
+
+                  LCOV_ARGS=()
+                  for TIX_FILE in "${COVERAGE_DIR}"/*.tix; do
+                    LCOV_FILE="${COVERAGE_DIR}/$(basename "${TIX_FILE}" tix).info"
+                    hpc-lcov -f "${TIX_FILE}" --main-package hpc-lcov -o "${LCOV_FILE}"
+                    LCOV_ARGS+=(-a "${LCOV_FILE}")
+                  done
+
+                  lcov "${LCOV_ARGS[@]}" > lcov-exe.info
+            - codecov/upload:
+                file: lcov-exe.info
 
   run_lint:
     executor: centos7
