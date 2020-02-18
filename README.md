@@ -23,6 +23,10 @@ TODO
 
 ### How do I convert coverage for an executable?
 
+Note: If you have both tests and executables, HPC will write outputs to the
+same file. Because of this, you'll have to load the coverage for each
+separately, with a `stack clean` in between.
+
 1. Build the executable with coverage enabled (e.g. `stack build --coverage`)
 1. Run the executable
 1. This should generate a `.tix` file in the current directory
@@ -30,25 +34,12 @@ TODO
     ```bash
     stack exec -- hpc-lcov --file my-exe.tix --main-package my-package
     ```
-1. (Optional) If you have both test and executable coverage, you'll need to
-   install LCOV (e.g. `brew install lcov`) and then run
 
-   ```bash
-   lcov -a lcov1.info -a lcov2.info ... > lcov.info
-   ```
+### How do I merge coverage files?
 
-Note: if your test and executable modules are named the same (e.g.
-`exe/Main.hs` and `test/Main.hs`), you'll need to run and get the coverage for
-each separately, then merge it. e.g.
+1. Install LCOV (e.g. `brew install lcov`)
+1. Run
 
-```bash
-stack build --coverage
-stack exec my-exe
-stack exec -- hpc-lcov --file my-exe.tix -o my-exe-lcov.info
-
-stack clean
-stack test --coverage
-stack exec -- hpc-lcov -o my-test-lcov.info
-
-lcov -a my-exe-lcov.info -a my-test-lcov.info > lcov.info
-```
+    ```bash
+    lcov -a lcov1.info -a lcov2.info ... > lcov.info
+    ```
