@@ -10,27 +10,6 @@ aliases:
       type: boolean
       default: false
 
-  - &cache_key
-    v0-{{ checksum "cache-key.txt" }}
-
-  - &step_build_cache_key
-    run:
-      name: Build cache key
-      command: |
-        FILES=(
-          "${STACK_YAML}"
-          package.yaml
-        )
-        echo "${STACK_YAML}" > cache-key.txt
-        cat "${FILES[@]}" >> cache-key.txt
-        curl -sSL https://get.haskellstack.org/ | sed -n 's/^STACK_VERSION="\(.*\)"/\1/p' >> cache-key.txt
-  - &step_install_stack
-    run:
-      name: Install stack
-      command: |
-        curl -sSL https://get.haskellstack.org/ | sh
-        stack --version
-
 executors:
   centos7:
     parameters:
@@ -48,6 +27,80 @@ executors:
 
 orbs:
   codecov: codecov/codecov@1.0.2
+  helpers:
+    commands:
+      init:
+        parameters:
+          cache_namespace:
+            type: string
+            default: ''
+        steps:
+          - checkout
+          - run:
+              name: Build cache key
+              command: |
+                FILES=(
+                  "${STACK_YAML}"
+                  package.yaml
+                )
+
+                echo "${STACK_YAML}" > cache-key.txt
+                cat "${FILES[@]}" >> cache-key.txt
+                curl -sSL https://get.haskellstack.org/ | sed -n 's/^STACK_VERSION="\(.*\)"/\1/p' >> cache-key.txt
+
+                if [[ -n "${CACHE_NAMESPACE}" ]]; then
+                  echo "${CACHE_NAMESPACE}" >> cache-key.txt
+                fi
+              environment:
+                CACHE_NAMESPACE: << parameters.cache_namespace >>
+
+      load_stack_project:
+        steps:
+          - run:
+              name: Install stack
+              command: |
+                curl -sSL https://get.haskellstack.org/ | sh
+                stack --version
+          - restore_cache:
+              key: v0-{{ checksum "cache-key.txt" }}
+
+      build_stack_deps:
+        parameters:
+          stack_options:
+            type: string
+            default: ''
+        steps:
+          - run:
+              name: Build external dependencies
+              command: stack build --test --only-dependencies << parameters.stack_options >>
+          - save_cache:
+              key: v0-{{ checksum "cache-key.txt" }}
+              paths:
+                - ~/.stack
+                - .stack-work
+
+      test_minimal_example:
+        parameters:
+          test_with_hpc_lcov:
+            type: string
+            default: hpc-lcov
+        steps:
+          - run:
+              name: Prep minimal-example test
+              command: cp "${STACK_YAML}" minimal-example/
+          - run:
+              name: Test minimal-example
+              command: |
+                stack test --coverage
+                hpc-lcov -o actual-lcov.info
+                diff -L expected lcov.info -L actual actual-lcov.info --unified
+              working_directory: /root/src/minimal-example
+          - run:
+              name: Test hpc-lcov executable on minimal-example
+              command: ../.circleci/test-hpc-lcov.sh "${COVERAGE_DIR}"
+              working_directory: /root/src/minimal-example
+              environment:
+                HPC_LCOV: << parameters.test_with_hpc_lcov >>
 
 jobs:
   run_build_and_test:
@@ -60,122 +113,75 @@ jobs:
       latest: << parameters.latest >>
 
     steps:
-      # init
-      - checkout
-      - *step_build_cache_key
-
-      # install stack and dependencies
-      - *step_install_stack
-      - restore_cache:
-          key: *cache_key
-      - run:
-          name: Build external dependencies
-          command: stack build --test --only-dependencies
-      - save_cache:
-          key: *cache_key
-          paths:
-            - ~/.stack
-            - .stack-work
-
-      # Run full build and test
+      - helpers/init
+      - helpers/load_stack_project
+      - helpers/build_stack_deps
       - run:
           name: Build and test hpc-lcov
+          command: .circleci/stack-build.sh --test --copy-bins
+      - helpers/test_minimal_example
+
+  test_latest:
+    executor:
+      name: centos7
+      latest: true
+
+    steps:
+      - helpers/init
+      - helpers/load_stack_project
+      - helpers/build_stack_deps
+      - run:
+          name: Full build without coverage
+          command: .circleci/stack-build.sh --test --no-run-tests --copy-bins
+
+      - run:
+          name: Build and test hpc-lcov with coverage
+          command: .circleci/stack-build.sh --test --coverage
+      - run:
+          name: Convert coverage output
+          command: hpc-lcov -o lcov-test.info
+      - codecov/upload:
+          file: lcov-test.info
+
+      - run:
+          name: Build and install with coverage
           command: |
-            STACK_ARGS=(
-              --ghc-options -Werror
-              --copy-bins
-              --local-bin-path /usr/local/bin
-            )
-
-            if [[ -n "${CI_LATEST}" ]]; then
-                STACK_ARGS+=(--coverage)
-            fi
-
-            # tasty-discover-3.0.2 does not discover all modules by default, but this
-            # flag is deprecated in newer versions
-            if [[ "${STACK_YAML}" == "stack-ghc-8.0.yaml" ]]; then
-              STACK_ARGS+=(--ghc-options '-optF --no-module-suffix')
-            fi
-
-            stack test "${STACK_ARGS[@]}"
-            mv /usr/local/bin/hpc-lcov /usr/local/bin/hpc-lcov-coverage-enabled
-
-      # build and install without coverage
-      # so that we can dog-food the project and use it to collect coverage
-      # reports for this project. Should not be built with coverage because
-      # we don't want to generate a hpc-lcov.tix file
+            stack clean
+            .circleci/stack-build.sh --local-bin-path . --copy-bins --coverage
+            mv hpc-lcov /usr/local/bin/hpc-lcov-coverage-enabled
+      - helpers/test_minimal_example:
+          test_with_hpc_lcov: /usr/local/bin/hpc-lcov-coverage-enabled
       - run:
-          name: Build and install without coverage
+          name: Convert coverage output
           command: |
-            # avoid rewriting .mix files and such
-            cp -r .stack-work .stack-work-with-coverage
-            stack install --ghc-options -Werror --local-bin-path /usr/local/bin
-            rm -rf .stack-work
-            mv .stack-work-with-coverage .stack-work
-
-      - when:
-          condition: << parameters.latest >>
-          steps:
-            - run:
-                name: Convert coverage output
-                command: hpc-lcov -o lcov-test.info
-            - codecov/upload:
-                file: lcov-test.info
-
-      # test minimal-example
+            for TIX_FILE in "${COVERAGE_DIR}"/*.tix; do
+              LCOV_FILE="${COVERAGE_DIR}/$(basename "${TIX_FILE}" tix).info"
+              hpc-lcov -f "${TIX_FILE}" --main-package hpc-lcov -o "${LCOV_FILE}"
+            done
       - run:
-          name: Prep minimal-example test
-          command: cp "${STACK_YAML}" minimal-example/
+          name: Install lcov
+          command: yum install -y epel-release && yum install -y lcov
       - run:
-          name: Test minimal-example
+          name: Combine coverage output
           command: |
-            stack test --coverage
-            hpc-lcov -o actual-lcov.info
-            diff -L expected lcov.info -L actual actual-lcov.info --unified
-          working_directory: /root/src/minimal-example
-
-      # Test hpc-lcov executable
-      - run:
-          name: Test hpc-lcov executable on minimal-example
-          command: ../.circleci/test-hpc-lcov.sh /usr/local/bin/hpc-lcov-coverage-enabled "${COVERAGE_DIR}"
-          working_directory: /root/src/minimal-example
-      - when:
-          condition: << parameters.latest >>
-          steps:
-            - run:
-                name: Convert coverage output
-                command: |
-                  yum install -y epel-release
-                  yum install -y lcov
-
-                  LCOV_ARGS=()
-                  for TIX_FILE in "${COVERAGE_DIR}"/*.tix; do
-                    LCOV_FILE="${COVERAGE_DIR}/$(basename "${TIX_FILE}" tix).info"
-                    hpc-lcov -f "${TIX_FILE}" --main-package hpc-lcov -o "${LCOV_FILE}"
-                    LCOV_ARGS+=(-a "${LCOV_FILE}")
-                  done
-
-                  lcov "${LCOV_ARGS[@]}" > lcov-exe.info
-            - codecov/upload:
-                file: lcov-exe.info
+            LCOV_ARGS=()
+            for LCOV_FILE in "${COVERAGE_DIR}"/*.info; do
+              LCOV_ARGS+=(-a "${LCOV_FILE}")
+            done
+            lcov "${LCOV_ARGS[@]}" > lcov-exe.info
+      - codecov/upload:
+          file: lcov-exe.info
 
   run_lint:
     executor: centos7
 
     steps:
-      # init
-      - checkout
-      - *step_build_cache_key
-
-      # install stack and dependencies
-      - *step_install_stack
-      - restore_cache:
-          key: *cache_key
+      - helpers/init
+      - helpers/load_stack_project
       - run:
           name: Build external dependencies
           command: stack build hlint stylish-haskell
 
-      # lint
       - run:
           name: Lint
           command: |
@@ -189,25 +195,12 @@ jobs:
     executor: centos7
 
     steps:
-      # init
-      - checkout
-      - *step_build_cache_key
-      - run: echo haddock >> cache-key.txt
+      - helpers/init:
+          cache_namespace: haddock
+      - helpers/load_stack_project
+      - helpers/build_stack_deps:
+          stack_options: --haddock
 
-      # install stack and dependencies
-      - *step_install_stack
-      - restore_cache:
-          key: *cache_key
-      - run:
-          name: Build external dependencies
-          command: stack build --test --only-dependencies --haddock
-      - save_cache:
-          key: *cache_key
-          paths:
-            - ~/.stack
-            - .stack-work
-
-      # haddock
       - run:
           name: Build haddock
           command: stack build --ghc-options -Werror --haddock
@@ -224,9 +217,7 @@ workflows:
 
   build_and_test:
     jobs:
-      - run_build_and_test:
-          name: test_latest
-          latest: true
+      - test_latest
       - run_build_and_test:
           name: test_ghc_8.8
           stack_yaml: stack-ghc-8.8.yaml

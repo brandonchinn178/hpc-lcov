@@ -15,10 +15,14 @@ function abort() {
     exit 1
 }
 
-HPC_LCOV="${1?}"
-DEST="${2?}"
+: ${HPC_LCOV:="$(type hpc-lcov)"}
+if [[ -x "${HPC_LCOV}" ]]; then
+    echo "Using hpc-lcov: ${HPC_LCOV}"
+else
+    echo "Not an existing executable: ${HPC_LCOV}"
+fi
 
-echo "Using hpc-lcov: ${HPC_LCOV}"
+DEST="${1?}"
 echo "Storing coverage files at: ${DEST}"
 
 mkdir -p "${DEST}"
