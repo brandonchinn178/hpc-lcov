@@ -17,7 +17,7 @@ services, like [Codecov](https://codecov.io).
 
 ### Cabal
 
-TODO
+Coming soon! (https://github.com/LeapYear/hpc-lcov/issues/3)
 
 ## FAQs
 
