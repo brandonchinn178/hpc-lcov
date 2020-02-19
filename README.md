@@ -17,7 +17,7 @@ services, like [Codecov](https://codecov.io).
 
 ### Cabal
 
-TODO
+Coming soon! (https://github.com/LeapYear/hpc-lcov/issues/3)
 
 ## FAQs
 
@@ -43,3 +43,8 @@ separately, with a `stack clean` in between.
     ```bash
     lcov -a lcov1.info -a lcov2.info ... > lcov.info
     ```
+
+## Resources
+
+* [LCOV format description](http://ltp.sourceforge.net/coverage/lcov/geninfo.1.php)
+* [More info on HPC](https://wiki.haskell.org/Haskell_program_coverage)
