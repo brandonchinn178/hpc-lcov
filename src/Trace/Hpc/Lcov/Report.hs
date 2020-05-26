@@ -11,9 +11,7 @@ module Trace.Hpc.Lcov.Report
   ) where
 
 import Data.List (intercalate)
-import Data.Word (Word32)
 import Trace.Hpc.Util (Hash)
-import Unsafe.Coerce (unsafeCoerce)
 
 -- http://ltp.sourceforge.net/coverage/lcov/geninfo.1.php
 newtype LcovReport = LcovReport [FileReport]
@@ -70,10 +68,9 @@ showReport (LcovReport fileReports) = unlines $ concatMap generateFileReport fil
     showFunctionHits FunctionReport{..} = line "FNDA" [show functionReportHits, functionReportName]
 
     generateBranchReport BranchReport{..} =
-      let branchHash = unsafeCoerce branchReportHash :: Word32
-          mkBranchLine branchNum hits = line "BRDA"
+      let mkBranchLine branchNum hits = line "BRDA"
             [ show branchReportLine
-            , show branchHash
+            , show branchReportHash
             , show (branchNum :: Int)
             , show hits
             ]
