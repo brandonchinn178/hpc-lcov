@@ -1,5 +1,11 @@
 ## Upcoming
 
+## 1.0.1
+
+Bug fix:
+
+* Don't error if the `packages` field in `stack.yaml` doesn't exist
+
 ## 1.0.0
 
 Initial release of `hpc-lcov`:
