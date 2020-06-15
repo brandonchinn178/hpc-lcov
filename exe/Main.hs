@@ -7,7 +7,8 @@
 import Control.Monad (forM)
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.Types as JSON
-import Data.HashMap.Lazy (HashMap, (!))
+import Data.HashMap.Lazy (HashMap)
+import qualified Data.HashMap.Lazy as HashMap
 import Data.List (find, isPrefixOf)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
@@ -168,8 +169,12 @@ getPackages = do
 
   stackConfigDir <- Path.parent <$> Path.parseAbsFile stackConfigPath
 
-  packagePaths <- maybe (fail $ "Invalid packages field: " ++ show stackConfig) return $
-    JSON.parseMaybe JSON.parseJSON (stackConfig ! "packages")
+  packagePaths <- case HashMap.lookup "packages" stackConfig of
+    Nothing -> pure ["."]
+    Just packagesField ->
+      case JSON.parseMaybe JSON.parseJSON packagesField of
+        Just packages -> return packages
+        Nothing -> fail $ "Invalid packages field: " ++ show stackConfig
 
   forM packagePaths $ \packagePath -> do
     packageDir <- case packagePath of
