@@ -133,6 +133,9 @@ jobs:
       - run:
           name: Full build without coverage
           command: .circleci/stack-build.sh --test --no-run-tests --copy-bins
+      - run:
+          name: Check Cabal file up to date
+          command: git diff --exit-code *.cabal
 
       - run:
           name: Build and test hpc-lcov with coverage
@@ -180,7 +183,11 @@ jobs:
       - helpers/load_stack_project
       - run:
           name: Build external dependencies
-          command: stack build hlint stylish-haskell
+          command: |
+            # Dependencies that take a lot of memory that shouldn't run in parallel
+            stack build haskell-src-exts
+
+            stack build hlint stylish-haskell
 
       - run:
           name: Lint
@@ -218,6 +225,9 @@ workflows:
   build_and_test:
     jobs:
       - test_latest
+      - run_build_and_test:
+          name: test_ghc_8.10
+          stack_yaml: stack-ghc-8.10.yaml
       - run_build_and_test:
           name: test_ghc_8.8
           stack_yaml: stack-ghc-8.8.yaml

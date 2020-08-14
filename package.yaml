@@ -45,7 +45,7 @@ executable:
   dependencies:
     - aeson >= 1.1.2.0 && < 1.6
     - hpc-lcov
-    - optparse-applicative >= 0.13.2.0 && < 0.16
+    - optparse-applicative >= 0.13.2.0 && < 0.17
     - path >= 0.6.0 && < 0.8
     - path-io >= 1.2.2 && < 1.7
     - process >= 1.4.3.0 && < 1.7

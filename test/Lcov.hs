@@ -3,6 +3,7 @@
 
 module Lcov where
 
+import Data.Bifunctor (first)
 import Data.List (sortOn)
 import Test.Tasty (TestTree)
 import Test.Tasty.HUnit (testCase, (@?=))
@@ -118,7 +119,7 @@ mkTix moduleName ticks = TixModule moduleName 0 (length ticks) ticks
 mkModuleToMix :: String -> FilePath -> [(Int, BoxLabel)] -> (String, FileInfo)
 mkModuleToMix moduleName filePath mixEntries = (moduleName, (filePath, mixs))
   where
-    mixs = flip map mixEntries $ \(line, boxLabel) -> (getHpcPos line, boxLabel)
+    mixs = map (first getHpcPos) mixEntries
 
 data TixMix = TixMix
   { tixMixModule   :: String
