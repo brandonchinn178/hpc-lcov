@@ -1,10 +1,10 @@
 cabal-version: >= 1.10
 
--- This file has been generated from package.yaml by hpack version 0.31.1.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: fcb5afe73b641055dbaa90b0e976ead73d6bf55fa27df7c61574f3762fc26ad6
+-- hash: 7635aa95e5767015bc12e7c80c2484f94e8f83e494d10b62bee2094ef2286690
 
 name:           hpc-lcov
 version:        1.0.1
@@ -59,7 +59,7 @@ executable hpc-lcov
     , containers >=0.5.7.1 && <0.7
     , hpc >=0.6.0.3 && <0.7
     , hpc-lcov
-    , optparse-applicative >=0.13.2.0 && <0.16
+    , optparse-applicative >=0.13.2.0 && <0.17
     , path >=0.6.0 && <0.8
     , path-io >=1.2.2 && <1.7
     , process >=1.4.3.0 && <1.7
