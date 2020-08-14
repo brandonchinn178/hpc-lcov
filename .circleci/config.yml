@@ -183,7 +183,11 @@ jobs:
       - helpers/load_stack_project
       - run:
           name: Build external dependencies
-          command: stack build hlint stylish-haskell
+          command: |
+            # Dependencies that take a lot of memory that shouldn't run in parallel
+            stack build haskell-src-exts
+
+            stack build hlint stylish-haskell
 
       - run:
           name: Lint
