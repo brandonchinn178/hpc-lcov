@@ -133,6 +133,9 @@ jobs:
       - run:
           name: Full build without coverage
           command: .circleci/stack-build.sh --test --no-run-tests --copy-bins
+      - run:
+          name: Check Cabal file up to date
+          command: git diff --exit-code *.cabal
 
       - run:
           name: Build and test hpc-lcov with coverage
