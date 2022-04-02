@@ -210,7 +210,7 @@ jobs:
 
       - run:
           name: Build haddock
-          command: stack build --ghc-options -Werror --haddock
+          command: stack build --haddock
       - run:
           name: Collect haddock
           command: |
