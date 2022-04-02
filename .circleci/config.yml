@@ -210,7 +210,7 @@ jobs:
 
       - run:
           name: Build haddock
-          command: stack build --ghc-options -Werror --haddock
+          command: stack build --haddock
       - run:
           name: Collect haddock
           command: |
@@ -225,6 +225,12 @@ workflows:
   build_and_test:
     jobs:
       - test_latest
+      - run_build_and_test:
+          name: test_ghc_9.2
+          stack_yaml: stack-ghc-9.2.yaml
+      - run_build_and_test:
+          name: test_ghc_9.0
+          stack_yaml: stack-ghc-9.0.yaml
       - run_build_and_test:
           name: test_ghc_8.10
           stack_yaml: stack-ghc-8.10.yaml
