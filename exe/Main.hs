@@ -20,41 +20,51 @@ import qualified Path
 import Path.IO (listDir, listDirRecur, resolveFile')
 import System.Process (readProcessWithExitCode)
 import Trace.Hpc.Lcov (generateLcovFromTix, writeReport)
-import Trace.Hpc.Mix (Mix(..), readMix)
-import Trace.Hpc.Tix (Tix(..), TixModule, readTix, tixModuleName)
+import Trace.Hpc.Mix (Mix (..), readMix)
+import Trace.Hpc.Tix (Tix (..), TixModule, readTix, tixModuleName)
 
 data CLIOptions = CLIOptions
-  { cliTixFiles    :: [FilePath]
+  { cliTixFiles :: [FilePath]
   , cliMainPackage :: Maybe String
-  , cliOutput      :: FilePath
+  , cliOutput :: FilePath
   }
 
 getCLIOptions :: IO CLIOptions
-getCLIOptions = Opt.execParser
-  $ Opt.info (Opt.helper <*> parseCLIOptions) $ Opt.progDesc description
+getCLIOptions =
+  Opt.execParser $
+    Opt.info (Opt.helper <*> parseCLIOptions) $ Opt.progDesc description
   where
-    parseCLIOptions = CLIOptions
-      <$> parseCLITixFiles
-      <*> parseCLIMainPackage
-      <*> parseCLIOutput
-    parseCLITixFiles = Opt.many $ Opt.strOption $ mconcat
-      [ Opt.long "file"
-      , Opt.short 'f'
-      , Opt.metavar "FILE"
-      , Opt.help "Manually specify .tix file(s) to convert"
-      ]
-    parseCLIMainPackage = Opt.optional $ Opt.strOption $ mconcat
-      [ Opt.long "main-package"
-      , Opt.metavar "PACKAGE"
-      , Opt.help "The package that built the coverage-enabled executable"
-      ]
-    parseCLIOutput = Opt.strOption $ mconcat
-      [ Opt.long "output"
-      , Opt.short 'o'
-      , Opt.metavar "FILE"
-      , Opt.help "The file to save coverage information (default: lcov.info)"
-      , Opt.value "lcov.info"
-      ]
+    parseCLIOptions =
+      CLIOptions
+        <$> parseCLITixFiles
+        <*> parseCLIMainPackage
+        <*> parseCLIOutput
+    parseCLITixFiles =
+      Opt.many $
+        Opt.strOption $
+          mconcat
+            [ Opt.long "file"
+            , Opt.short 'f'
+            , Opt.metavar "FILE"
+            , Opt.help "Manually specify .tix file(s) to convert"
+            ]
+    parseCLIMainPackage =
+      Opt.optional $
+        Opt.strOption $
+          mconcat
+            [ Opt.long "main-package"
+            , Opt.metavar "PACKAGE"
+            , Opt.help "The package that built the coverage-enabled executable"
+            ]
+    parseCLIOutput =
+      Opt.strOption $
+        mconcat
+          [ Opt.long "output"
+          , Opt.short 'o'
+          , Opt.metavar "FILE"
+          , Opt.help "The file to save coverage information (default: lcov.info)"
+          , Opt.value "lcov.info"
+          ]
 
     description = "Convert HPC coverage output into the LCOV format"
 
@@ -63,9 +73,10 @@ main = do
   CLIOptions{..} <- getCLIOptions
   stackRoot <- getStackRoot
 
-  tixFiles <- if null cliTixFiles
-    then findTixModules
-    else mapM resolveFile' cliTixFiles
+  tixFiles <-
+    if null cliTixFiles
+      then findTixModules
+      else mapM resolveFile' cliTixFiles
   tixModules <- filter (not . isPathsModule) . concat <$> mapM readTixPath tixFiles
 
   distDir <- getStackDistPath
@@ -77,9 +88,10 @@ main = do
     fileLocRelPath <- Path.parseRelFile fileLoc
 
     let modulePackageName = case tixModuleName tixModule of
-          "Main" -> fromMaybe
-            (error "Found executable in coverage file, --main-package was not provided")
-            cliMainPackage
+          "Main" ->
+            fromMaybe
+              (error "Found executable in coverage file, --main-package was not provided")
+              cliMainPackage
           _ -> getPackageName tixModule
 
     modulePath <- case modulePackageName `lookup` packages of
@@ -92,9 +104,10 @@ main = do
     return (tixModuleName tixModule, (Path.toFilePath modulePath, mixEntries))
 
   let moduleToMix = Map.toList . Map.fromListWith checkDupeMix $ moduleToMixList
-      checkDupeMix mix1 mix2 = if mix1 == mix2
-        then mix1
-        else error $ ".mix files differ: " ++ show (mix1, mix2)
+      checkDupeMix mix1 mix2 =
+        if mix1 == mix2
+          then mix1
+          else error $ ".mix files differ: " ++ show (mix1, mix2)
       report = generateLcovFromTix moduleToMix tixModules
 
   writeReport cliOutput report
@@ -113,7 +126,7 @@ findTixModules = do
       -- if multiple .tix files are generated.
       mAllTix = find ((== [relfile|all.tix|]) . Path.filename) tixFiles
 
-  return $ maybe tixFiles (:[]) mAllTix
+  return $ maybe tixFiles (: []) mAllTix
 
 getMixDirectory :: Path Rel Dir -> Path Abs Dir -> Path Abs Dir
 getMixDirectory distDir packageDir = packageDir </> distDir </> [reldir|hpc|]
@@ -122,8 +135,9 @@ getMixDirectory distDir packageDir = packageDir </> distDir </> [reldir|hpc|]
 
 readTixPath :: Path b File -> IO [TixModule]
 readTixPath path = do
-  Tix tixModules <- readTix (Path.toFilePath path) >>=
-    maybe (fail $ "Could not find tix file: " ++ Path.toFilePath path) return
+  Tix tixModules <-
+    readTix (Path.toFilePath path)
+      >>= maybe (fail $ "Could not find tix file: " ++ Path.toFilePath path) return
   return tixModules
 
 readMixPath :: [Path b Dir] -> Either String TixModule -> IO Mix
@@ -164,8 +178,9 @@ getStackDistPath = Path.parseRelDir =<< readStack ["path", "--dist-dir"]
 getPackages :: IO [(String, Path Abs Dir)]
 getPackages = do
   stackConfigPath <- readStack ["path", "--config-location"]
-  stackConfig <- Yaml.decodeFileEither @(HashMap String JSON.Value) stackConfigPath >>=
-    either (\e -> fail $ "Could not decode file `" ++ stackConfigPath ++ "`: " ++ show e) return
+  stackConfig <-
+    Yaml.decodeFileEither @(HashMap String JSON.Value) stackConfigPath
+      >>= either (\e -> fail $ "Could not decode file `" ++ stackConfigPath ++ "`: " ++ show e) return
 
   stackConfigDir <- Path.parent <$> Path.parseAbsFile stackConfigPath
 
@@ -202,6 +217,7 @@ readStack args = do
 hasExt :: String -> Path b File -> Bool
 hasExt ext = (== ext') . Path.fileExtension
   where
+
 #if MIN_VERSION_path(0,7,0)
     ext' = Just ext
 #else
@@ -209,6 +225,7 @@ hasExt ext = (== ext') . Path.fileExtension
 #endif
 
 removeExtension :: Path b File -> IO (Path b File)
+
 #if MIN_VERSION_path(0,7,0)
 removeExtension = fmap fst . Path.splitExtension
 #else
