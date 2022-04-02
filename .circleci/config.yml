@@ -30,10 +30,6 @@ orbs:
   helpers:
     commands:
       init:
-        parameters:
-          cache_namespace:
-            type: string
-            default: ''
         steps:
           - checkout
           - run:
@@ -46,13 +42,6 @@ orbs:
 
                 echo "${STACK_YAML}" > cache-key.txt
                 cat "${FILES[@]}" >> cache-key.txt
-                curl -sSL https://get.haskellstack.org/ | sed -n 's/^STACK_VERSION="\(.*\)"/\1/p' >> cache-key.txt
-
-                if [[ -n "${CACHE_NAMESPACE}" ]]; then
-                  echo "${CACHE_NAMESPACE}" >> cache-key.txt
-                fi
-              environment:
-                CACHE_NAMESPACE: << parameters.cache_namespace >>
 
       load_stack_project:
         steps:
@@ -60,9 +49,9 @@ orbs:
               name: Install stack
               command: |
                 curl -sSL https://get.haskellstack.org/ | sh
-                stack --version
+                stack --version | tee -a cache-key.txt
           - restore_cache:
-              key: v0-{{ checksum "cache-key.txt" }}
+              key: v0-{{ .Environment.CIRCLE_JOB }}-{{ checksum "cache-key.txt" }}
 
       build_stack_deps:
         parameters:
@@ -74,7 +63,7 @@ orbs:
               name: Build external dependencies
               command: stack build --test --only-dependencies << parameters.stack_options >>
           - save_cache:
-              key: v0-{{ checksum "cache-key.txt" }}
+              key: v0-{{ .Environment.CIRCLE_JOB }}-{{ checksum "cache-key.txt" }}
               paths:
                 - ~/.stack
                 - .stack-work
@@ -198,8 +187,7 @@ jobs:
     executor: centos7
 
     steps:
-      - helpers/init:
-          cache_namespace: haddock
+      - helpers/init
       - helpers/load_stack_project
       - helpers/build_stack_deps:
           stack_options: --haddock
