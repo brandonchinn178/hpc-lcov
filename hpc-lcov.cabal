@@ -4,7 +4,7 @@ cabal-version: >= 1.10
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 69fee8b1d0a170c22016c3030f48c1ca40ccb4601bec2194a95c409fdb1fb320
+-- hash: 6f7e3eafa7388657b0cd9859214bc8e830b0efdc06c69880cf64b4cb01adb921
 
 name:           hpc-lcov
 version:        1.0.1
@@ -59,7 +59,7 @@ executable hpc-lcov
     , containers >=0.5.7.1 && <0.7
     , hpc >=0.6.0.3 && <0.7
     , hpc-lcov
-    , optparse-applicative >=0.13.2.0 && <0.17
+    , optparse-applicative >=0.13.2.0 && <0.18
     , path >=0.6.0 && <0.10
     , path-io >=1.2.2 && <1.8
     , process >=1.4.3.0 && <1.7
