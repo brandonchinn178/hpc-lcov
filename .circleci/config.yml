@@ -172,7 +172,9 @@ jobs:
       - helpers/load_stack_project
       - run:
           name: Build linters
-          command: stack build -j1 hlint fourmolu
+          command: |
+            yum install -y ncurses-devel
+            stack build -j1 hlint fourmolu
 
       - run:
           name: Lint
