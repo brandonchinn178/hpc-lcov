@@ -52,7 +52,7 @@ executable hpc-lcov
       exe
   ghc-options: -Wall
   build-depends:
-      aeson >=1.1.2.0 && <2.1
+      aeson >=1.1.2.0 && <3
     , base >=4.9 && <5
     , containers >=0.5.7.1 && <0.7
     , hpc >=0.6.0.3 && <0.7
