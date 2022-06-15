@@ -43,7 +43,7 @@ executable:
   source-dirs: exe
   main: Main.hs
   dependencies:
-    - aeson >= 1.1.2.0 && < 2.1
+    - aeson >= 1.1.2.0 && < 3
     - hpc-lcov
     - optparse-applicative >= 0.13.2.0 && < 0.18
     - path >= 0.6.0 && < 0.10
