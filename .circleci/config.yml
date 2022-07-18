@@ -86,7 +86,7 @@ orbs:
               working_directory: /root/src/minimal-example
           - run:
               name: Test hpc-lcov executable on minimal-example
-              command: ../.circleci/test-hpc-lcov.sh "${COVERAGE_DIR}"
+              command: ../.circleci/test-hpc-lcov.sh "${HPC_LCOV}" "${COVERAGE_DIR}"
               working_directory: /root/src/minimal-example
               environment:
                 HPC_LCOV: << parameters.test_with_hpc_lcov >>
