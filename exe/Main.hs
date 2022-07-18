@@ -35,7 +35,8 @@ data CLIOptions = CLIOptions
 getCLIOptions :: IO CLIOptions
 getCLIOptions =
   Opt.execParser $
-    Opt.info (Opt.helper <*> parseCLIOptions) $ Opt.progDesc description
+    Opt.info (Opt.helper <*> parseCLIOptions) $
+      Opt.progDesc description
   where
     parseCLIOptions =
       CLIOptions
