@@ -11,6 +11,10 @@ to always be up to date.
 
 ```bash
 stack build hpc-lcov
+HPC_LCOV=$(stack exec which hpc-lcov)
+
+cp stack.yaml "minimal-example/"
+cd "minimal-example/"
 stack test --coverage
-stack exec hpc-lcov
+"${HPC_LCOV}"
 ```
