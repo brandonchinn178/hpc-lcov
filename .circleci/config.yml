@@ -181,8 +181,8 @@ jobs:
           command: |
             set +e
             STATUS=0
-            scripts/hlint.sh || STATUS=1
-            scripts/fourmolu.sh || STATUS=1
+            hlint . || STATUS=1
+            fourmolu -m check $(git ls-files '*.hs') || STATUS=1
             exit "${STATUS}"
 
   run_haddock:
