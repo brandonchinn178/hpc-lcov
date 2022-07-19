@@ -1,5 +1,3 @@
 .DS_Store
 .stack-work/
-minimal-example/*.cabal
-/.ci/
 stack-ghc-*.yaml.lock

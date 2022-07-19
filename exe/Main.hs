@@ -1,9 +1,11 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 
+import Control.Exception (ErrorCall (..), evaluate, throwIO, try)
 import Control.Monad (forM)
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.Types as JSON
@@ -18,6 +20,7 @@ import qualified Options.Applicative as Opt
 import Path (Abs, Dir, File, Path, Rel, reldir, relfile, (</>))
 import qualified Path
 import Path.IO (listDir, listDirRecur, resolveFile')
+import System.Exit (ExitCode (..))
 import System.Process (readProcessWithExitCode)
 import Trace.Hpc.Lcov (generateLcovFromTix, writeReport)
 import Trace.Hpc.Mix (Mix (..), readMix)
@@ -32,7 +35,8 @@ data CLIOptions = CLIOptions
 getCLIOptions :: IO CLIOptions
 getCLIOptions =
   Opt.execParser $
-    Opt.info (Opt.helper <*> parseCLIOptions) $ Opt.progDesc description
+    Opt.info (Opt.helper <*> parseCLIOptions) $
+      Opt.progDesc description
   where
     parseCLIOptions =
       CLIOptions
@@ -84,15 +88,34 @@ main = do
   let mixDirectories = map (getMixDirectory distDir . snd) packages
 
   moduleToMixList <- forM tixModules $ \tixModule -> do
-    Mix fileLoc _ _ _ mixEntries <- readMixPath mixDirectories (Right tixModule)
-    fileLocRelPath <- Path.parseRelFile fileLoc
+    (modulePackageName, Mix fileLoc _ _ _ mixEntries) <-
+      -- tixModuleName is either just the module name or in the format `PACKAGE-VERSION-HASH/MODULE`
+      case Text.splitOn "/" . Text.pack . tixModuleName $ tixModule of
+        [packageVersionHash, _] -> do
+          let dropEnd n xs = take (length xs - n) xs
+          let pkgName = Text.intercalate "-" . dropEnd 2 . Text.splitOn "-" $ packageVersionHash
+          mix <- readMixPathThrow mixDirectories (Right tixModule)
+          return (Text.unpack pkgName, mix)
+        ["Main"] -> do
+          let pkgName =
+                fromMaybe
+                  (error "Found executable in coverage file, --main-package was not provided")
+                  cliMainPackage
+          mix <-
+            readMixPath mixDirectories (Right tixModule) >>= \case
+              Right x -> return x
+              Left (ErrorCallWithLocation msg _)
+                | "does not match hash" `Text.isInfixOf` Text.pack msg ->
+                    error . unlines $
+                      [ "Coverage file for a Main module contained a different hash from the Mix file."
+                      , "Did you forget to load the coverage separately?"
+                      , "See the README of hpc-lcov for more information."
+                      ]
+              Left e -> throwIO e
+          return (pkgName, mix)
+        _ -> error $ "Could not load Mix file from tix module: " ++ show tixModule
 
-    let modulePackageName = case tixModuleName tixModule of
-          "Main" ->
-            fromMaybe
-              (error "Found executable in coverage file, --main-package was not provided")
-              cliMainPackage
-          _ -> getPackageName tixModule
+    fileLocRelPath <- Path.parseRelFile fileLoc
 
     modulePath <- case modulePackageName `lookup` packages of
       Just packagePath -> do
@@ -140,21 +163,13 @@ readTixPath path = do
       >>= maybe (fail $ "Could not find tix file: " ++ Path.toFilePath path) return
   return tixModules
 
-readMixPath :: [Path b Dir] -> Either String TixModule -> IO Mix
-readMixPath = readMix . map Path.toFilePath
+readMixPathThrow :: [Path b Dir] -> Either String TixModule -> IO Mix
+readMixPathThrow = readMix . map Path.toFilePath
+
+readMixPath :: [Path b Dir] -> Either String TixModule -> IO (Either ErrorCall Mix)
+readMixPath dirs tix = try (readMixPathThrow dirs tix >>= evaluate)
 
 {- Haskell package/module helpers -}
-
-getPackageName :: TixModule -> String
-getPackageName = Text.unpack . takePackageName . Text.pack . tixModuleName
-  where
-    -- Tix module name is either just the module name or in the format `PACKAGE-VERSION-HASH/MODULE`
-    takePackageName s = case Text.splitOn "/" s of
-      [packageVersionHash, _] ->
-        Text.intercalate "-" . dropEnd 2 . Text.splitOn "-" $ packageVersionHash
-      _ -> s
-
-    dropEnd n xs = take (length xs - n) xs
 
 isPathsModule :: TixModule -> Bool
 isPathsModule = ("Paths_" `isPrefixOf`) . tixModuleName
@@ -209,8 +224,16 @@ getPackages = do
 
 readStack :: [String] -> IO String
 readStack args = do
-  (_, stdout, _) <- readProcessWithExitCode "stack" args ""
-  return . head . lines $ stdout
+  (code, stdout, stderr) <- readProcessWithExitCode "stack" args ""
+  case (code, lines stdout) of
+    (ExitSuccess, line : _) -> return line
+    _ ->
+      error . unlines $
+        [ "Reading Stack output failed."
+        , "Code: " ++ show code
+        , "Stdout: " ++ stdout
+        , "Stderr: " ++ stderr
+        ]
 
 {- Utilities -}
 

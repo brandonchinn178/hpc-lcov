@@ -18,16 +18,15 @@ The following linters must pass CI in order for your PR to be accepted.
 * HLint
 
     ```bash
-    scripts/hlint.sh
+    stack install hlint
+    hlint .
     ```
 
-* stylish-haskell
+* Fourmolu
 
     ```bash
-    scripts/stylish-haskell.sh
-
-    # apply stylish-haskell changes
-    scripts/stylish-haskell.sh --apply
+    stack install fourmolu
+    fourmolu -i $(git ls-files "*.hs")
     ```
 
 ## Run tests
