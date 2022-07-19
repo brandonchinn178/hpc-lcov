@@ -24,11 +24,9 @@ Coming soon! (https://github.com/LeapYear/hpc-lcov/issues/3)
 
 ### How do I convert coverage for an executable?
 
-Note: If you have both tests and executables, HPC will write outputs to the
-same file. Because of this, you'll have to load the coverage for each
-separately, with a `stack clean` in between.
+Note: If you have both tests and executables, HPC will write module information to the same file. Because of this, you'll have to load the coverage for each separately, with a `stack clean` in between.
 
-1. Build the executable with coverage enabled (e.g. `stack build --coverage`)
+1. Build a single executable with coverage enabled (e.g. `stack build :my-exe --coverage`)
 1. Run the executable
 1. This should generate a `.tix` file in the current directory
 1. Run the following, specifying the package that builds the executable:
