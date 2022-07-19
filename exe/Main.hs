@@ -18,6 +18,7 @@ import qualified Options.Applicative as Opt
 import Path (Abs, Dir, File, Path, Rel, reldir, relfile, (</>))
 import qualified Path
 import Path.IO (listDir, listDirRecur, resolveFile')
+import System.Exit (ExitCode (..))
 import System.Process (readProcessWithExitCode)
 import Trace.Hpc.Lcov (generateLcovFromTix, writeReport)
 import Trace.Hpc.Mix (Mix (..), readMix)
@@ -209,8 +210,16 @@ getPackages = do
 
 readStack :: [String] -> IO String
 readStack args = do
-  (_, stdout, _) <- readProcessWithExitCode "stack" args ""
-  return . head . lines $ stdout
+  (code, stdout, stderr) <- readProcessWithExitCode "stack" args ""
+  case (code, lines stdout) of
+    (ExitSuccess, line : _) -> return line
+    _ ->
+      error . unlines $
+        [ "Reading Stack output failed."
+        , "Code: " ++ show code
+        , "Stdout: " ++ stdout
+        , "Stderr: " ++ stderr
+        ]
 
 {- Utilities -}
 
