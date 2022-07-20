@@ -1,8 +1,8 @@
 # hpc-lcov
 
+[![GitHub Actions](https://img.shields.io/github/workflow/status/LeapYear/hpc-lcov/CI/main)](https://github.com/LeapYear/hpc-lcov/actions?query=branch%3Amain)
 [![codecov](https://codecov.io/gh/LeapYear/hpc-lcov/branch/main/graph/badge.svg?token=8TErU2ntw9)](https://codecov.io/gh/LeapYear/hpc-lcov)
-![CircleCI](https://img.shields.io/circleci/build/github/LeapYear/hpc-lcov)
-![Hackage](https://img.shields.io/hackage/v/hpc-lcov)
+[![Hackage](https://img.shields.io/hackage/v/hpc-lcov)](https://hackage.haskell.org/package/hpc-lcov)
 
 Convert HPC output into `lcov.info` files that can be uploaded to coverage
 services, like [Codecov](https://codecov.io).
