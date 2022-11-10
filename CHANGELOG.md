@@ -1,16 +1,16 @@
 # Unreleased
 
-# 1.1.0
+# v1.1.0
 
 * Drop support for GHC < 8.6
 
-# 1.0.1
+# v1.0.1
 
 Bug fix:
 
 * Don't error if the `packages` field in `stack.yaml` doesn't exist
 
-# 1.0.0
+# v1.0.0
 
 Initial release of `hpc-lcov`:
 
