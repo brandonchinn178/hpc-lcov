@@ -68,6 +68,6 @@ exec_hpc_lcov -o /tmp/my-exe-lcov-2.info
 check_output /tmp/my-exe-lcov-2.info
 
 header "Testing --file"
-TIX_FILE="$(find "$(stack path --local-hpc-root)" -name "*.tix" | head)"
+TIX_FILE="$(find "$(stack path --local-hpc-root)" -name "*.tix" | head -n 1)"
 test_hpc_lcov --file "${TIX_FILE}"
 test_hpc_lcov -f "${TIX_FILE}" -f "${TIX_FILE}"
