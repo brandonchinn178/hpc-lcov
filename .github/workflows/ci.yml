@@ -22,7 +22,7 @@ jobs:
             latest: true
 
     name: build_and_test (${{ matrix.stack_yaml }})
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     env:
       STACK_YAML: ${{ matrix.stack_yaml }}
 
@@ -99,7 +99,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FOURMOLU_VERSION: '0.7.0.1'
-      HLINT_VERSION: '3.4.1'
+      HLINT_VERSION: '3.5'
     steps:
       - uses: actions/checkout@v3
 
