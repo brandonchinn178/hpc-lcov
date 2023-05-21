@@ -1,3 +1,6 @@
+# This snapshot pins the oldest supported GHC version and the lower
+# bounds of all dependent packages.
+
 resolver: lts-14.27
 
 ghc-options:

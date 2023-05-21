@@ -62,3 +62,5 @@ tests:
       - tasty-discover
       - tasty-golden
       - tasty-hunit
+    build-tools:
+      - tasty-discover:tasty-discover
