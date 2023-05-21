@@ -1,7 +1,7 @@
 # hpc-lcov
 
-[![GitHub Actions](https://img.shields.io/github/workflow/status/LeapYear/hpc-lcov/CI/main)](https://github.com/LeapYear/hpc-lcov/actions?query=branch%3Amain)
-[![codecov](https://codecov.io/gh/LeapYear/hpc-lcov/branch/main/graph/badge.svg?token=8TErU2ntw9)](https://codecov.io/gh/LeapYear/hpc-lcov)
+[![GitHub Actions](https://img.shields.io/github/actions/workflow/status/brandonchinn178/hpc-lcov/ci.yml?branch=main)](https://github.com/brandonchinn178/hpc-lcov/actions?query=branch%3Amain)
+[![codecov](https://codecov.io/gh/brandonchinn178/hpc-lcov/branch/main/graph/badge.svg?token=8TErU2ntw9)](https://codecov.io/gh/brandonchinn178/hpc-lcov)
 [![Hackage](https://img.shields.io/hackage/v/hpc-lcov)](https://hackage.haskell.org/package/hpc-lcov)
 
 Convert HPC output into `lcov.info` files that can be uploaded to coverage
@@ -9,16 +9,12 @@ services, like [Codecov](https://codecov.io).
 
 ## Quickstart
 
-### Stack
-
-1. Run `stack install hpc-lcov`
-1. Run your test(s) with coverage, e.g. `stack test --coverage`
+1. Download `hpc-lcov` from the releases page or install it from Hackage with your favorite package manager
+1. Run your tests with coverage enabled
+    * `stack test --coverage`
+    * Cabal is not yet supported (https://github.com/brandonchinn178/hpc-lcov/issues/3)
 1. Run `hpc-lcov`
 1. Upload the generated `lcov.info` file to your coverage service
-
-### Cabal
-
-Coming soon! (https://github.com/LeapYear/hpc-lcov/issues/3)
 
 ## FAQs
 

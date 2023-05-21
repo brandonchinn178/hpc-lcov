@@ -20,10 +20,10 @@ type FileInfo = (FilePath, [MixEntry])
 
 -- | Generate LCOV format from HPC coverage data.
 generateLcovFromTix ::
-  -- | Mapping from module name to file info
-  [(String, FileInfo)] ->
-  [TixModule] ->
-  LcovReport
+  [(String, FileInfo)]
+  -- ^ Mapping from module name to file info
+  -> [TixModule]
+  -> LcovReport
 generateLcovFromTix moduleToMix = LcovReport . map mkFileReport . mergeTixModules
   where
     mkFileReport tixModule =
@@ -41,11 +41,10 @@ generateLcovFromTix moduleToMix = LcovReport . map mkFileReport . mergeTixModule
             , fileReportLines = mergeLineReports $ overTixMix parseLineReport
             }
 
-{- | Merge all tix modules representing the same module.
-
- If tix modules are duplicated, we are treating them as being hit in different test suites, so all
- tick counts should be added together.
--}
+-- | Merge all tix modules representing the same module.
+--
+--  If tix modules are duplicated, we are treating them as being hit in different test suites, so all
+--  tick counts should be added together.
 mergeTixModules :: [TixModule] -> [TixModule]
 mergeTixModules = Map.elems . Map.fromListWith mergeTixs . map (tixModuleName &&& id)
   where
@@ -105,5 +104,5 @@ mergeLineReports = Map.elems . Map.fromListWith (maxBy lineReportHits) . map (li
 hpcPosLine :: HpcPos -> Int
 hpcPosLine = (\(startLine, _, _, _) -> startLine) . fromHpcPos
 
-maxBy :: Ord b => (a -> b) -> a -> a -> a
+maxBy :: (Ord b) => (a -> b) -> a -> a -> a
 maxBy f a b = maximumBy (comparing f) [a, b]

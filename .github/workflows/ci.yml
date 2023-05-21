@@ -5,21 +5,20 @@ on:
     branches:
       - main
   workflow_call:
+    outputs:
+      version:
+        value: ${{ jobs.build_prod.outputs.version }}
 
 jobs:
   build_and_test:
     strategy:
       matrix:
-        stack_yaml:
-          - stack-ghc-8.6.yaml
-          - stack-ghc-8.8.yaml
-          - stack-ghc-8.10.yaml
-          - stack-ghc-9.0.yaml
-          - stack-ghc-9.2.yaml
-          - stack-ghc-9.4.yaml
         include:
-          - stack_yaml: stack.yaml
+          -
+            stack_yaml: stack.yaml
             latest: true
+          -
+            stack_yaml: stack-ghc-8.10.yaml
 
     name: build_and_test (${{ matrix.stack_yaml }})
     runs-on: ubuntu-latest
@@ -27,59 +26,72 @@ jobs:
       STACK_YAML: ${{ matrix.stack_yaml }}
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      -
+        uses: actions/checkout@v3
+      -
+        uses: actions/cache@v3
         with:
           path: ~/.stack
           key: ${{ runner.os }}-stack-cache-${{ hashFiles(matrix.stack_yaml, 'package.yaml') }}
-      - run: echo 'export PATH=~/.local/bin:$PATH' >> $GITHUB_ENV
+      -
+        run: echo 'export PATH=~/.local/bin:$PATH' >> $GITHUB_ENV
 
       # build executable without coverage enabled
-      - name: Build executable without coverage enabled
+      -
+        name: Build executable without coverage enabled
         run: |
           stack install hpc-lcov:exe:hpc-lcov
           (cd ~/.local/bin && mv hpc-lcov hpc-lcov-no-coverage)
 
       # build + run unit tests
-      - name: Build + test
+      -
+        name: Build + test
         run: stack test --coverage
 
       # upload coverage of unit tests
-      - name: Convert coverage output
+      -
+        name: Convert coverage output
         run: hpc-lcov-no-coverage -o lcov-test.info
-      - if: ${{ matrix.latest }}
+      -
+        if: ${{ matrix.latest }}
         uses: codecov/codecov-action@v3
         with:
           files: lcov-test.info
-
-      - name: Check that files are unmodified
+      -
+        name: Check that files are unmodified
         run: git diff --exit-code
 
       # run integration tests without checking coverage of exe
-      - name: Build executable with coverage enabled
+      -
+        name: Build executable with coverage enabled
         run: |
           stack clean
           stack install hpc-lcov:exe:hpc-lcov --coverage
           (cd ~/.local/bin && mv hpc-lcov hpc-lcov-coverage)
-      - name: Prep minimal-example test
+      -
+        name: Prep minimal-example test
         run: cp "${STACK_YAML}" minimal-example/stack.yaml
-      - name: Test minimal-example
+      -
+        name: Test minimal-example
         run: |
           unset STACK_YAML
           stack test --coverage
           hpc-lcov-no-coverage -o /tmp/actual-lcov.info
           diff -L expected lcov.info -L actual /tmp/actual-lcov.info --unified
         working-directory: minimal-example
-      - name: Test hpc-lcov executable on minimal-example
+      -
+        name: Test hpc-lcov executable on minimal-example
         run: |
           unset STACK_YAML
           ../.github/steps/test-hpc-lcov.sh ~/.local/bin/hpc-lcov-coverage /tmp/integration-coverage/
         working-directory: minimal-example
 
       # upload coverage of integration tests
-      - name: Install lcov
+      -
+        name: Install lcov
         run: sudo apt-get install -y lcov
-      - name: Convert + combine coverage output
+      -
+        name: Convert + combine coverage output
         run: |
           LCOV_ARGS=()
           find /tmp/integration-coverage -name "*.tix" | while read TIX_FILE; do
@@ -90,29 +102,138 @@ jobs:
           if [[ "${#LCOV_ARGS}" -gt 0 ]]; then
             lcov "${LCOV_ARGS[@]}" > lcov-exe.info
           fi
-      - if: ${{ matrix.latest }}
+      -
+        if: ${{ matrix.latest }}
         uses: codecov/codecov-action@v3
         with:
           files: lcov-exe.info
 
+  ghc_compat_test:
+    strategy:
+      matrix:
+        ghc_version:
+          - '8.10'
+          - '9.0'
+          - '9.2'
+          - '9.4'
+          - '9.6'
+
+    name: ghc_compat_test (${{ matrix.ghc_version }})
+    runs-on: ubuntu-latest
+
+    steps:
+      -
+        uses: actions/checkout@v3
+      -
+        id: setup
+        name: Set up GHC ${{ matrix.ghc_version }}
+        uses: haskell-actions/setup@v2
+        with:
+          ghc-version: ${{ matrix.ghc_version }}
+      -
+        name: Configure the build
+        run: |
+          cabal configure --test-show-details=streaming
+          cabal build --dry-run
+      -
+        name: Get current month to clear cache
+        run: echo "CURR_MONTH=$(date +%B)" | tee -a "$GITHUB_ENV"
+      -
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.setup.outputs.cabal-store }}
+          key: ${{ runner.os }}-cabal-cache-${{ env.CURR_MONTH }}-${{ matrix.ghc_version }}-${{ hashFiles('**/plan.json') }}
+          restore-keys: |
+               ${{ runner.os }}-cabal-cache-${{ env.CURR_MONTH }}-${{ matrix.ghc_version }}-
+      -
+        name: Build + Test
+        run: cabal test
+
+  build_prod:
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+
+    name: 'build_prod: ${{ matrix.os }}'
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      -
+        uses: actions/checkout@v3
+      -
+        uses: actions/cache@v3
+        with:
+          path: ~/.stack
+          key: ${{ runner.os }}-build_prod-${{ hashFiles('stack.yaml', 'hpc-lcov.cabal') }}
+      -
+        name: Build
+        run: |
+          ARGS=(
+              # install binary to ./bin/
+              --copy-bins --local-bin-path ./bin/
+
+              # build flags
+              --ghc-options -Werror
+              --test
+
+              # production flags
+              --ghc-options -O2
+          )
+          stack build "${ARGS[@]}"
+
+      -
+        uses: haskell-actions/parse-cabal-file@v1
+        id: cabal_file
+        with:
+          cabal_file: hpc-lcov.cabal
+      -
+        name: Rename binary
+        run: |
+          set -x
+          case ${{ runner.os }} in
+            (Linux) os=linux ;;
+            (macOS) os=osx ;;
+            (*) echo 'Unknown OS' >&2; exit 1 ;;
+          esac
+          case ${{ runner.arch }} in
+            (X64) arch=x86_64 ;;
+            (*) echo 'Unknown architecture' >&2; exit 1 ;;
+          esac
+          cp bin/hpc-lcov bin/hpc-lcov-$version-$os-$arch
+        env:
+          version: ${{ steps.cabal_file.outputs.version }}
+      -
+        name: Store binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: hpc-lcov-binary-${{ matrix.os }}
+          path: bin/hpc-lcov-*
+
+    outputs:
+      version: ${{ steps.cabal_file.outputs.version }}
+
   lint:
     runs-on: ubuntu-latest
     env:
-      FOURMOLU_VERSION: '0.7.0.1'
+      FOURMOLU_VERSION: '0.12.0.0'
       HLINT_VERSION: '3.5'
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Install fourmolu
+      -
+        uses: actions/checkout@v3
+      -
+        name: Install fourmolu
         run: |
           curl -fsSL \
             "https://github.com/fourmolu/fourmolu/releases/download/v${FOURMOLU_VERSION}/fourmolu-${FOURMOLU_VERSION}-linux-x86_64" \
             -o /usr/local/bin/fourmolu
           chmod +x /usr/local/bin/fourmolu
-      - name: Run fourmolu
-        run: fourmolu -m check $(git ls-files '*.hs')
-
-      - name: Install hlint
+      -
+        name: Run fourmolu
+        run: fourmolu -m check .
+      -
+        name: Install hlint
         run: |
           tmpdir=$(mktemp -d)
           curl -fsSL \
@@ -122,25 +243,28 @@ jobs:
           mv "${tmpdir}/hlint-${HLINT_VERSION}/hlint" /usr/local/bin/hlint
           chmod +x /usr/local/bin/hlint
           rm -rf "${tmpdir}"
-      - name: Run hlint
+      -
+        name: Run hlint
         run: hlint .
 
   check_sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      -
+        uses: actions/checkout@v3
+      -
+        uses: actions/cache@v3
         with:
           path: ~/.stack
           key: ${{ runner.os }}-check_sdist-${{ hashFiles('stack.yaml', 'package.yaml') }}
-
-      - name: Strip unreleased section from CHANGELOG
+      -
+        name: Strip unreleased section from CHANGELOG
         run: sed -i -n '/^# Unreleased/d; /^#/,$p' CHANGELOG.md
-
-      - name: Create sdist bundle
+      -
+        name: Create sdist bundle
         run: stack sdist --test-tarball --tar-dir .
-
-      - uses: actions/upload-artifact@v3
+      -
+        uses: actions/upload-artifact@v3
         with:
           name: hpc-lcov-sdist
           path: hpc-lcov-*.tar.gz
