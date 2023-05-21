@@ -1,3 +1,7 @@
 .DS_Store
+
 .stack-work/
 stack-ghc-*.yaml.lock
+
+cabal.project.local*
+dist-newstyle/
