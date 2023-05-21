@@ -18,15 +18,15 @@ The following linters must pass CI in order for your PR to be accepted.
 * HLint
 
     ```bash
-    stack install hlint
+    cabal install hlint-3.5
     hlint .
     ```
 
 * Fourmolu
 
     ```bash
-    stack install fourmolu
-    fourmolu -i $(git ls-files "*.hs")
+    cabal install fourmolu-0.12.0.0
+    fourmolu -i .
     ```
 
 ## Run tests

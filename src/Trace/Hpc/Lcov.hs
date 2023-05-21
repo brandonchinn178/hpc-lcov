@@ -105,5 +105,5 @@ mergeLineReports = Map.elems . Map.fromListWith (maxBy lineReportHits) . map (li
 hpcPosLine :: HpcPos -> Int
 hpcPosLine = (\(startLine, _, _, _) -> startLine) . fromHpcPos
 
-maxBy :: Ord b => (a -> b) -> a -> a -> a
+maxBy :: (Ord b) => (a -> b) -> a -> a -> a
 maxBy f a b = maximumBy (comparing f) [a, b]
