@@ -27,59 +27,72 @@ jobs:
       STACK_YAML: ${{ matrix.stack_yaml }}
 
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      -
+        uses: actions/checkout@v3
+      -
+        uses: actions/cache@v3
         with:
           path: ~/.stack
           key: ${{ runner.os }}-stack-cache-${{ hashFiles(matrix.stack_yaml, 'package.yaml') }}
-      - run: echo 'export PATH=~/.local/bin:$PATH' >> $GITHUB_ENV
+      -
+        run: echo 'export PATH=~/.local/bin:$PATH' >> $GITHUB_ENV
 
       # build executable without coverage enabled
-      - name: Build executable without coverage enabled
+      -
+        name: Build executable without coverage enabled
         run: |
           stack install hpc-lcov:exe:hpc-lcov
           (cd ~/.local/bin && mv hpc-lcov hpc-lcov-no-coverage)
 
       # build + run unit tests
-      - name: Build + test
+      -
+        name: Build + test
         run: stack test --coverage
 
       # upload coverage of unit tests
-      - name: Convert coverage output
+      -
+        name: Convert coverage output
         run: hpc-lcov-no-coverage -o lcov-test.info
-      - if: ${{ matrix.latest }}
+      -
+        if: ${{ matrix.latest }}
         uses: codecov/codecov-action@v3
         with:
           files: lcov-test.info
-
-      - name: Check that files are unmodified
+      -
+        name: Check that files are unmodified
         run: git diff --exit-code
 
       # run integration tests without checking coverage of exe
-      - name: Build executable with coverage enabled
+      -
+        name: Build executable with coverage enabled
         run: |
           stack clean
           stack install hpc-lcov:exe:hpc-lcov --coverage
           (cd ~/.local/bin && mv hpc-lcov hpc-lcov-coverage)
-      - name: Prep minimal-example test
+      -
+        name: Prep minimal-example test
         run: cp "${STACK_YAML}" minimal-example/stack.yaml
-      - name: Test minimal-example
+      -
+        name: Test minimal-example
         run: |
           unset STACK_YAML
           stack test --coverage
           hpc-lcov-no-coverage -o /tmp/actual-lcov.info
           diff -L expected lcov.info -L actual /tmp/actual-lcov.info --unified
         working-directory: minimal-example
-      - name: Test hpc-lcov executable on minimal-example
+      -
+        name: Test hpc-lcov executable on minimal-example
         run: |
           unset STACK_YAML
           ../.github/steps/test-hpc-lcov.sh ~/.local/bin/hpc-lcov-coverage /tmp/integration-coverage/
         working-directory: minimal-example
 
       # upload coverage of integration tests
-      - name: Install lcov
+      -
+        name: Install lcov
         run: sudo apt-get install -y lcov
-      - name: Convert + combine coverage output
+      -
+        name: Convert + combine coverage output
         run: |
           LCOV_ARGS=()
           find /tmp/integration-coverage -name "*.tix" | while read TIX_FILE; do
@@ -90,7 +103,8 @@ jobs:
           if [[ "${#LCOV_ARGS}" -gt 0 ]]; then
             lcov "${LCOV_ARGS[@]}" > lcov-exe.info
           fi
-      - if: ${{ matrix.latest }}
+      -
+        if: ${{ matrix.latest }}
         uses: codecov/codecov-action@v3
         with:
           files: lcov-exe.info
@@ -101,18 +115,20 @@ jobs:
       FOURMOLU_VERSION: '0.12.0.0'
       HLINT_VERSION: '3.5'
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Install fourmolu
+      -
+        uses: actions/checkout@v3
+      -
+        name: Install fourmolu
         run: |
           curl -fsSL \
             "https://github.com/fourmolu/fourmolu/releases/download/v${FOURMOLU_VERSION}/fourmolu-${FOURMOLU_VERSION}-linux-x86_64" \
             -o /usr/local/bin/fourmolu
           chmod +x /usr/local/bin/fourmolu
-      - name: Run fourmolu
+      -
+        name: Run fourmolu
         run: fourmolu -m check .
-
-      - name: Install hlint
+      -
+        name: Install hlint
         run: |
           tmpdir=$(mktemp -d)
           curl -fsSL \
@@ -122,25 +138,28 @@ jobs:
           mv "${tmpdir}/hlint-${HLINT_VERSION}/hlint" /usr/local/bin/hlint
           chmod +x /usr/local/bin/hlint
           rm -rf "${tmpdir}"
-      - name: Run hlint
+      -
+        name: Run hlint
         run: hlint .
 
   check_sdist:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/cache@v3
+      -
+        uses: actions/checkout@v3
+      -
+        uses: actions/cache@v3
         with:
           path: ~/.stack
           key: ${{ runner.os }}-check_sdist-${{ hashFiles('stack.yaml', 'package.yaml') }}
-
-      - name: Strip unreleased section from CHANGELOG
+      -
+        name: Strip unreleased section from CHANGELOG
         run: sed -i -n '/^# Unreleased/d; /^#/,$p' CHANGELOG.md
-
-      - name: Create sdist bundle
+      -
+        name: Create sdist bundle
         run: stack sdist --test-tarball --tar-dir .
-
-      - uses: actions/upload-artifact@v3
+      -
+        uses: actions/upload-artifact@v3
         with:
           name: hpc-lcov-sdist
           path: hpc-lcov-*.tar.gz
