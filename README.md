@@ -1,7 +1,7 @@
 # hpc-lcov
 
 [![GitHub Actions](https://img.shields.io/github/actions/workflow/status/brandonchinn178/hpc-lcov/ci.yml?branch=main)](https://github.com/brandonchinn178/hpc-lcov/actions?query=branch%3Amain)
-[![codecov](https://codecov.io/gh/LeapYear/hpc-lcov/branch/main/graph/badge.svg?token=8TErU2ntw9)](https://codecov.io/gh/LeapYear/hpc-lcov)
+[![codecov](https://codecov.io/gh/brandonchinn178/hpc-lcov/branch/main/graph/badge.svg?token=8TErU2ntw9)](https://codecov.io/gh/brandonchinn178/hpc-lcov)
 [![Hackage](https://img.shields.io/hackage/v/hpc-lcov)](https://hackage.haskell.org/package/hpc-lcov)
 
 Convert HPC output into `lcov.info` files that can be uploaded to coverage
@@ -18,7 +18,7 @@ services, like [Codecov](https://codecov.io).
 
 ### Cabal
 
-Coming soon! (https://github.com/LeapYear/hpc-lcov/issues/3)
+Coming soon! (https://github.com/brandonchinn178/hpc-lcov/issues/3)
 
 ## FAQs
 

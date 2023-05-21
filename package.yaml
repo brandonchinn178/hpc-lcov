@@ -4,9 +4,9 @@ verbatim:
   cabal-version: '>= 1.10'
 license: BSD3
 author:
-  - Brandon Chinn <brandon@leapyear.io>
+  - Brandon Chinn <brandonchinn178@gmail.com>
 maintainer:
-  - Brandon Chinn <brandon@leapyear.io>
+  - Brandon Chinn <brandonchinn178@gmail.com>
 category: Control
 synopsis: Convert HPC output into LCOV format
 description: |
@@ -16,7 +16,7 @@ extra-source-files:
   - CHANGELOG.md
   - test/golden/*
 
-github: LeapYear/hpc-lcov
+github: brandonchinn178/hpc-lcov
 
 ghc-options: -Wall
 when:
