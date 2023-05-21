@@ -9,16 +9,12 @@ services, like [Codecov](https://codecov.io).
 
 ## Quickstart
 
-### Stack
-
-1. Run `stack install hpc-lcov`
-1. Run your test(s) with coverage, e.g. `stack test --coverage`
+1. Download `hpc-lcov` from the releases page or install it from Hackage with your favorite package manager
+1. Run your tests with coverage enabled
+    * `stack test --coverage`
+    * Cabal is not yet supported (https://github.com/brandonchinn178/hpc-lcov/issues/3)
 1. Run `hpc-lcov`
 1. Upload the generated `lcov.info` file to your coverage service
-
-### Cabal
-
-Coming soon! (https://github.com/brandonchinn178/hpc-lcov/issues/3)
 
 ## FAQs
 

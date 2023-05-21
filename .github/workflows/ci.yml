@@ -5,6 +5,9 @@ on:
     branches:
       - main
   workflow_call:
+    outputs:
+      version:
+        value: ${{ jobs.build_prod.outputs.version }}
 
 jobs:
   build_and_test:
@@ -147,6 +150,71 @@ jobs:
       -
         name: Build + Test
         run: cabal test
+
+  build_prod:
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+
+    name: 'build_prod: ${{ matrix.os }}'
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      -
+        uses: actions/checkout@v3
+      -
+        uses: actions/cache@v3
+        with:
+          path: ~/.stack
+          key: ${{ runner.os }}-build_prod-${{ hashFiles('stack.yaml', 'hpc-lcov.cabal') }}
+      -
+        name: Build
+        run: |
+          ARGS=(
+              # install binary to ./bin/
+              --copy-bins --local-bin-path ./bin/
+
+              # build flags
+              --ghc-options -Werror
+              --test
+
+              # production flags
+              --ghc-options -O2
+          )
+          stack build "${ARGS[@]}"
+
+      -
+        uses: haskell-actions/parse-cabal-file@v1
+        id: cabal_file
+        with:
+          cabal_file: hpc-lcov.cabal
+      -
+        name: Rename binary
+        run: |
+          set -x
+          case ${{ runner.os }} in
+            (Linux) os=linux ;;
+            (macOS) os=osx ;;
+            (*) echo 'Unknown OS' >&2; exit 1 ;;
+          esac
+          case ${{ runner.arch }} in
+            (X64) arch=x86_64 ;;
+            (*) echo 'Unknown architecture' >&2; exit 1 ;;
+          esac
+          cp bin/hpc-lcov bin/hpc-lcov-$version-$os-$arch
+        env:
+          version: ${{ steps.cabal_file.outputs.version }}
+      -
+        name: Store binary
+        uses: actions/upload-artifact@v3
+        with:
+          name: hpc-lcov-binary-${{ matrix.os }}
+          path: bin/hpc-lcov-*
+
+    outputs:
+      version: ${{ steps.cabal_file.outputs.version }}
 
   lint:
     runs-on: ubuntu-latest

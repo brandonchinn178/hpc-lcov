@@ -10,9 +10,22 @@ jobs:
     needs:
       - ci
 
+    env:
+      VERSION: ${{ needs.ci.outputs.version }}
+
     steps:
       -
         uses: actions/checkout@v3
+      -
+        uses: actions/download-artifact@v3
+        with:
+          name: hpc-lcov-binary-ubuntu-latest
+          path: ./bin/
+      -
+        uses: actions/download-artifact@v3
+        with:
+          name: hpc-lcov-binary-macos-latest
+          path: ./bin/
       -
         uses: actions/download-artifact@v3
         with:
@@ -24,13 +37,10 @@ jobs:
         with:
           cabal_file: hpc-lcov.cabal
       -
-        name: Set version label
-        run: echo 'VERSION=v${{ steps.cabal_file.outputs.version }}' >> "${GITHUB_ENV}"
-      -
         name: Get CHANGELOG section
         run: |
           sed '/^# Unreleased/,/^$/d' CHANGELOG.md > /tmp/changelog-without-unreleased
-          if [[ "$(head -n 1 /tmp/changelog-without-unreleased)" != "# ${VERSION}" ]]; then
+          if [[ "$(head -n 1 /tmp/changelog-without-unreleased)" != "# v${VERSION}" ]]; then
             echo "CHANGELOG doesn't look updated" >&2
             exit 1
           fi
@@ -49,7 +59,11 @@ jobs:
       -
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ env.VERSION }}
+          tag_name: v${{ env.VERSION }}
           body_path: /tmp/changelog-body
           draft: true
           target_commitish: ${{ github.sha }}
+          files: |
+            bin/hpc-lcov-${{ env.VERSION }}-linux-x86_64
+            bin/hpc-lcov-${{ env.VERSION }}-osx-x86_64
+          fail_on_unmatched_files: true
