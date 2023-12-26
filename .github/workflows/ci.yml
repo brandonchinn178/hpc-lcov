@@ -11,19 +11,8 @@ on:
 
 jobs:
   build_and_test:
-    strategy:
-      matrix:
-        include:
-          -
-            stack_yaml: stack.yaml
-            latest: true
-          -
-            stack_yaml: stack-ghc-8.10.yaml
-
-    name: build_and_test (${{ matrix.stack_yaml }})
+    name: build_and_test
     runs-on: ubuntu-latest
-    env:
-      STACK_YAML: ${{ matrix.stack_yaml }}
 
     steps:
       -
@@ -32,7 +21,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.stack
-          key: ${{ runner.os }}-stack-cache-${{ hashFiles(matrix.stack_yaml, 'package.yaml') }}
+          key: ${{ runner.os }}-stack-cache-${{ hashFiles('stack.yaml', 'package.yaml') }}
       -
         run: echo 'export PATH=~/.local/bin:$PATH' >> $GITHUB_ENV
 
@@ -53,7 +42,6 @@ jobs:
         name: Convert coverage output
         run: hpc-lcov-no-coverage -o lcov-test.info
       -
-        if: ${{ matrix.latest }}
         uses: codecov/codecov-action@v3
         with:
           files: lcov-test.info
@@ -70,11 +58,10 @@ jobs:
           (cd ~/.local/bin && mv hpc-lcov hpc-lcov-coverage)
       -
         name: Prep minimal-example test
-        run: cp "${STACK_YAML}" minimal-example/stack.yaml
+        run: cp stack.yaml minimal-example/stack.yaml
       -
         name: Test minimal-example
         run: |
-          unset STACK_YAML
           stack test --coverage
           hpc-lcov-no-coverage -o /tmp/actual-lcov.info
           diff -L expected lcov.info -L actual /tmp/actual-lcov.info --unified
@@ -82,7 +69,6 @@ jobs:
       -
         name: Test hpc-lcov executable on minimal-example
         run: |
-          unset STACK_YAML
           ../.github/steps/test-hpc-lcov.sh ~/.local/bin/hpc-lcov-coverage /tmp/integration-coverage/
         working-directory: minimal-example
 
@@ -103,7 +89,6 @@ jobs:
             lcov "${LCOV_ARGS[@]}" > lcov-exe.info
           fi
       -
-        if: ${{ matrix.latest }}
         uses: codecov/codecov-action@v3
         with:
           files: lcov-exe.info
@@ -112,11 +97,9 @@ jobs:
     strategy:
       matrix:
         ghc_version:
-          - '8.10'
-          - '9.0'
-          - '9.2'
           - '9.4'
           - '9.6'
+          - '9.8'
 
     name: ghc_compat_test (${{ matrix.ghc_version }})
     runs-on: ubuntu-latest
