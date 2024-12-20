@@ -100,6 +100,8 @@ jobs:
           - '9.4'
           - '9.6'
           - '9.8'
+          - '9.10'
+          - '9.12'
 
     name: ghc_compat_test (${{ matrix.ghc_version }})
     runs-on: ubuntu-latest
@@ -117,6 +119,21 @@ jobs:
         name: Configure the build
         run: |
           cabal configure --test-show-details=streaming
+
+          # 9.12; TODO: remove
+          cabal configure --enable-append \
+            --allow-newer=aeson:{ghc-prim,template-haskell} \
+            --allow-newer=hashable:base \
+            --allow-newer=indexed-traversable-instances:base \
+            --allow-newer=indexed-traversable:base \
+            --allow-newer=integer-conversion:base \
+            --allow-newer=scientific:{base,template-haskell} \
+            --allow-newer=semialign:base \
+            --allow-newer=these:base \
+            --allow-newer=time-compat:{base,time} \
+            --allow-newer=unordered-containers:template-haskell \
+            --allow-newer=uuid-types:template-haskell
+
           cabal build --dry-run
       -
         name: Get current month to clear cache
