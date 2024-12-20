@@ -3,10 +3,24 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    hackage: path-0.9.5@sha256:3bdc437c4b120b90c222adf8324cbbe4fc35f7272a872dc4d003ea9292c56d1e,3273
+    pantry-tree:
+      sha256: 1eacdfa4e7c0aa278229a9548692fe1e95fb0a6b21ec0c9bd3a73cc0b50d4878
+      size: 1206
+  original:
+    hackage: path-0.9.5
+- completed:
+    hackage: path-io-1.8.2@sha256:97725811b06f3fea7c1f2b0b39f21806c2f90470fc571acd75d3606b49b0f0d9,2009
+    pantry-tree:
+      sha256: 14dc5dc9c1f71b2568390ff7f1ad7f8237101ee98a05fe82068e9479468416cb
+      size: 318
+  original:
+    hackage: path-io-1.8.2
 snapshots:
 - completed:
-    sha256: 53a2800f7fe0c4628af0e7d5e985707dd3af9863ac3983a43c835dbaa8ed5f35
-    size: 714094
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/22/3.yaml
-  original: lts-22.3
+    sha256: 2413f1dbf803da9cab3b6970d868cf7cd4c013b8776dee3cebd8b8ecbf85514c
+    size: 619614
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2024/12/20.yaml
+  original: nightly-2024-12-20
