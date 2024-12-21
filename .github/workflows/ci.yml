@@ -227,7 +227,7 @@ jobs:
         name: Store binary
         uses: actions/upload-artifact@v3
         with:
-          name: hpc-lcov-binary-${{ matrix.os }}
+          name: hpc-lcov-binary-${{ matrix.target }}
           path: bin/hpc-lcov-*
 
     outputs:

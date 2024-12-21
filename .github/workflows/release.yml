@@ -19,12 +19,17 @@ jobs:
       -
         uses: actions/download-artifact@v3
         with:
-          name: hpc-lcov-binary-ubuntu-latest
+          name: hpc-lcov-binary-linux-x86_64
           path: ./bin/
       -
         uses: actions/download-artifact@v3
         with:
-          name: hpc-lcov-binary-macos-latest
+          name: hpc-lcov-binary-osx-x86_64
+          path: ./bin/
+      -
+        uses: actions/download-artifact@v3
+        with:
+          name: hpc-lcov-binary-osx-arm64
           path: ./bin/
       -
         uses: actions/download-artifact@v3
@@ -66,4 +71,5 @@ jobs:
           files: |
             bin/hpc-lcov-${{ env.VERSION }}-linux-x86_64
             bin/hpc-lcov-${{ env.VERSION }}-osx-x86_64
+            bin/hpc-lcov-${{ env.VERSION }}-osx-arm64
           fail_on_unmatched_files: true
