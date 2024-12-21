@@ -9,11 +9,13 @@ import Control.Exception (ErrorCall (..), evaluate, throwIO, try)
 import Control.Monad (forM)
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.Types as JSON
+import Data.Char (isDigit)
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as HashMap
 import Data.List (find, isPrefixOf)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
+import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Yaml as Yaml
 import qualified Options.Applicative as Opt
@@ -89,13 +91,11 @@ main = do
 
   moduleToMixList <- forM tixModules $ \tixModule -> do
     (modulePackageName, Mix fileLoc _ _ _ mixEntries) <-
-      -- tixModuleName is either just the module name or in the format `PACKAGE-VERSION-HASH/MODULE`
+      -- tixModuleName is either just the module name or "PACKAGE_ID/MODULE"
       case Text.splitOn "/" . Text.pack . tixModuleName $ tixModule of
-        [packageVersionHash, _] -> do
-          let dropEnd n xs = take (length xs - n) xs
-          let pkgName = Text.intercalate "-" . dropEnd 2 . Text.splitOn "-" $ packageVersionHash
+        [packageId, _] -> do
           mix <- readMixPathThrow mixDirectories (Right tixModule)
-          return (Text.unpack pkgName, mix)
+          return (Text.unpack $ packageNameFromId packageId, mix)
         ["Main"] -> do
           let pkgName =
                 fromMaybe
@@ -134,6 +134,14 @@ main = do
       report = generateLcovFromTix moduleToMix tixModules
 
   writeReport cliOutput report
+
+-- Parse the input, which is in one of the following formats:
+--     * PACKAGE-VERSION-HASH
+--     * PACKAGE-VERSION-HASH-EXE_NAME (>= GHC 9.10)
+packageNameFromId :: Text -> Text
+packageNameFromId = Text.intercalate "-" . takeWhile (not . isVersion) . Text.splitOn "-"
+  where
+    isVersion s = '.' `Text.elem` s || Text.all isDigit s
 
 {- HPC file discovery -}
 

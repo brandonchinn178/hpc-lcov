@@ -6,10 +6,12 @@ dependencies:
 
 library:
   source-dirs: src
+  other-modules: []  # don't generate Paths_minimal_example.hs
 
 tests:
   minimal-example-test:
     source-dirs: test
+    other-modules: []  # don't generate Paths_minimal_example.hs
     main: Main.hs
     dependencies:
       - minimal-example

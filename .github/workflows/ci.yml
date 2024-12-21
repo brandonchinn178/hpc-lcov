@@ -100,6 +100,8 @@ jobs:
           - '9.4'
           - '9.6'
           - '9.8'
+          - '9.10'
+          - '9.12'
 
     name: ghc_compat_test (${{ matrix.ghc_version }})
     runs-on: ubuntu-latest
@@ -117,6 +119,21 @@ jobs:
         name: Configure the build
         run: |
           cabal configure --test-show-details=streaming
+
+          # 9.12; TODO: remove
+          cabal configure --enable-append \
+            --allow-newer=aeson:{ghc-prim,template-haskell} \
+            --allow-newer=hashable:base \
+            --allow-newer=indexed-traversable-instances:base \
+            --allow-newer=indexed-traversable:base \
+            --allow-newer=integer-conversion:base \
+            --allow-newer=scientific:{base,template-haskell} \
+            --allow-newer=semialign:base \
+            --allow-newer=these:base \
+            --allow-newer=time-compat:{base,time} \
+            --allow-newer=unordered-containers:template-haskell \
+            --allow-newer=uuid-types:template-haskell
+
           cabal build --dry-run
       -
         name: Get current month to clear cache
@@ -135,16 +152,46 @@ jobs:
   build_prod:
     strategy:
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
+        include:
+          # https://github.com/actions/runner-images?tab=readme-ov-file#available-images
+          -
+            target: linux-x86_64
+            os: ubuntu-latest
+          -
+            target: osx-x86_64
+            os: macos-13
+          -
+            target: osx-arm64
+            os: macos-latest
 
     name: 'build_prod: ${{ matrix.os }}'
     runs-on: ${{ matrix.os }}
 
     steps:
       -
+        name: Verify platform
+        run: |
+          set -x
+          case ${{ runner.os }} in
+            (Linux) os=linux ;;
+            (macOS) os=osx ;;
+            (*) echo 'Unknown OS' >&1; exit 1 ;;
+          esac
+          case ${{ runner.arch }} in
+            (X64) arch=x86_64 ;;
+            (ARM64) arch=arm64 ;;
+            (*) echo 'Unknown architecture' >&1; exit 1 ;;
+          esac
+          if [[ $os-$arch != ${{ matrix.target }} ]]; then
+            echo "Incorrect platform: $os-$arch" >&2
+            exit 1
+          fi
+      -
         uses: actions/checkout@v3
+      -
+        uses: haskell-actions/setup@v2
+        with:
+          enable-stack: true
       -
         uses: actions/cache@v3
         with:
@@ -173,18 +220,7 @@ jobs:
           cabal_file: hpc-lcov.cabal
       -
         name: Rename binary
-        run: |
-          set -x
-          case ${{ runner.os }} in
-            (Linux) os=linux ;;
-            (macOS) os=osx ;;
-            (*) echo 'Unknown OS' >&2; exit 1 ;;
-          esac
-          case ${{ runner.arch }} in
-            (X64) arch=x86_64 ;;
-            (*) echo 'Unknown architecture' >&2; exit 1 ;;
-          esac
-          cp bin/hpc-lcov bin/hpc-lcov-$version-$os-$arch
+        run: cp bin/hpc-lcov bin/hpc-lcov-$version-${{ matrix.target }}
         env:
           version: ${{ steps.cabal_file.outputs.version }}
       -
